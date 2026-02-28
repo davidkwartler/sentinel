@@ -10,7 +10,9 @@ const CACHE_KEY = "sentinel_fp_sent"
 
 export function FingerprintReporter() {
   useEffect(() => {
-    if (sessionStorage.getItem(CACHE_KEY)) return
+    const cached = sessionStorage.getItem(CACHE_KEY)
+    const ttl = Number(process.env.NEXT_PUBLIC_FINGERPRINT_TTL_MS ?? 1_800_000)
+    if (cached && Date.now() - Number(cached) < ttl) return
 
     const apiKey = process.env.NEXT_PUBLIC_FINGERPRINT_API_KEY
     if (!apiKey) {
@@ -45,7 +47,7 @@ export function FingerprintReporter() {
         })
 
         if (res.ok) {
-          sessionStorage.setItem(CACHE_KEY, "1")
+          sessionStorage.setItem(CACHE_KEY, String(Date.now()))
         }
       } catch (err) {
         console.error("[Sentinel] Fingerprint capture failed:", err)
