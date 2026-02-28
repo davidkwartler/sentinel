@@ -36,11 +36,31 @@ model Account {
 }
 
 model Session {
-  id           String   @id @default(cuid())
-  sessionToken String   @unique
+  id           String        @id @default(cuid())
+  sessionToken String        @unique
   userId       String
   expires      DateTime
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  fingerprints Fingerprint[]
+}
+
+model Fingerprint {
+  id         String   @id @default(cuid())
+  sessionId  String
+  visitorId  String
+  requestId  String   @unique
+  ip         String?
+  userAgent  String?  @db.Text
+  os         String?
+  browser    String?
+  screenRes  String?
+  timezone   String?
+  isOriginal Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  session    Session  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId])
+  @@index([visitorId])
 }
 
 model VerificationToken {
