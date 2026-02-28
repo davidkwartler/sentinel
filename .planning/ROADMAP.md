@@ -42,7 +42,9 @@ Decimal phases appear between their surrounding integers in numeric order.
   1. Authenticated user can navigate to a product listing page and see a grid of products (static/mock data is fine)
   2. Authenticated user can navigate to an account/profile page and see their session identity (name or email from OAuth)
   3. Both pages are unreachable without authentication — the auth gate from Phase 1 applies to the entire shop route group
-**Plans**: TBD
+**Plans**: 1 plan
+Plans:
+- [ ] 02-01-PLAN.md — Remove redundant auth null guard from profile/page.tsx (phase already built; one quality fix)
 
 ### Phase 3: Fingerprint Capture
 **Goal**: Every authenticated page load records a stable browser fingerprint in the database — ingest only, no detection logic yet
@@ -119,4 +121,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
 
 ---
 *Roadmap created: 2026-02-28*
-*Last updated: 2026-02-28 — Phase 4 planned (2 plans: schema+library, route integration)*
+*Last updated: 2026-02-28 — Phase 2 planned (1 plan: redundant auth guard removal); Phase 4 planned (2 plans: schema+library, route integration)*
