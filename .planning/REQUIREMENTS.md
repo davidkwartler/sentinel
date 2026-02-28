@@ -81,7 +81,7 @@
 
 ## Traceability
 
-Which phases cover which requirements. Updated during roadmap creation.
+All 20 v1 requirements are mapped to Phases 1-6. Phase 7 (Deploy and Polish) carries no new requirements — it validates the full system in the production environment and produces the simulation walkthrough.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
@@ -109,8 +109,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 **Coverage:**
 - v1 requirements: 20 total
 - Mapped to phases: 20
-- Unmapped: 0 ✓
+- Unmapped: 0 (Phase 7 is production delivery — no new requirements)
 
 ---
 *Requirements defined: 2026-02-28*
-*Last updated: 2026-02-28 after initial definition*
+*Last updated: 2026-02-28 after roadmap creation — traceability confirmed*
