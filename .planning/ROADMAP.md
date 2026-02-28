@@ -12,9 +12,9 @@ Sentinel builds in seven dependency-ordered phases, each delivering one independ
 
 Decimal phases appear between their surrounding integers in numeric order.
 
-- [ ] **Phase 1: Foundation** - Google OAuth, database sessions, Prisma schema, middleware auth gate
-- [ ] **Phase 2: E-Commerce Shell** - Auth-gated product and profile pages giving the session realistic surface area
-- [ ] **Phase 3: Fingerprint Capture** - FingerprintJS Pro client + server ingest with deduplication; fingerprint tuples written to database
+- [x] **Phase 1: Foundation** - Google OAuth, database sessions, Prisma schema, middleware auth gate
+- [x] **Phase 2: E-Commerce Shell** - Auth-gated product and profile pages giving the session realistic surface area
+- [x] **Phase 3: Fingerprint Capture** - FingerprintJS Pro client + server ingest with deduplication; fingerprint tuples written to database
 - [ ] **Phase 4: Detection Engine** - Mismatch detection comparing new fingerprint tuples against stored originals; detection events persisted
 - [ ] **Phase 5: Claude Integration** - Async Claude API call on confirmed mismatch returning structured confidence score and reasoning
 - [ ] **Phase 6: Security Dashboard** - Authenticated session table with fingerprint summaries, confidence scores, flag badges, and expandable reasoning
@@ -64,7 +64,10 @@ Decimal phases appear between their surrounding integers in numeric order.
   2. The detection event contains: timestamp, sessionId, original visitorId, new visitorId, and IP addresses of both requests
   3. Before a detection event is created, a component-level similarity check runs comparing OS, browser family, timezone, and screen resolution — and the result is reflected in the detection event (e.g., a field or log indicating whether similarity was factored)
   4. A second request from the same browser (same visitorId) on the same session does NOT create a detection event
-**Plans**: TBD
+**Plans**: 2 plans
+Plans:
+- [ ] 04-01-PLAN.md — Schema migration + detection library (DetectionEvent model, computeSimilarity, runDetection)
+- [ ] 04-02-PLAN.md — Route handler integration + hijack simulation verification checkpoint
 
 ### Phase 5: Claude Integration
 **Goal**: A confirmed fingerprint mismatch triggers an asynchronous Claude API call that returns a structured confidence score and reasoning, stored in the database — the HTTP response returns immediately without blocking
@@ -106,14 +109,14 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Foundation | 0/3 | Not started | - |
-| 2. E-Commerce Shell | 0/TBD | Not started | - |
-| 3. Fingerprint Capture | 0/TBD | Not started | - |
-| 4. Detection Engine | 0/TBD | Not started | - |
+| 1. Foundation | ✅ | Done | 2026-02-28 |
+| 2. E-Commerce Shell | ✅ | Done | 2026-02-28 |
+| 3. Fingerprint Capture | ✅ | Done | 2026-02-28 |
+| 4. Detection Engine | 0/2 | In progress | - |
 | 5. Claude Integration | 0/TBD | Not started | - |
 | 6. Security Dashboard | 0/TBD | Not started | - |
 | 7. Deploy and Polish | 0/TBD | Not started | - |
 
 ---
 *Roadmap created: 2026-02-28*
-*Last updated: 2026-02-28 after initial roadmap creation*
+*Last updated: 2026-02-28 — Phase 4 planned (2 plans: schema+library, route integration)*
