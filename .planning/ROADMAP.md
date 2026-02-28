@@ -32,7 +32,7 @@ Decimal phases appear between their surrounding integers in numeric order.
   3. Navigating between protected pages does not trigger re-authentication — the session persists
   4. Visiting a protected route while signed out redirects to the login page, not a 404 or unhandled error
   5. Prisma schema is deployed to Neon and the Auth.js session tables exist with rows after sign-in
-**Plans**: TBD
+**Plans**: 3 (01-PLAN: scaffold+DB, 02-PLAN: auth wiring, 03-PLAN: OAuth verification checkpoint)
 
 ### Phase 2: E-Commerce Shell
 **Goal**: Authenticated users can browse a product listing and view their account profile — providing the realistic session surface area that makes the demo credible
@@ -106,7 +106,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Foundation | 0/TBD | Not started | - |
+| 1. Foundation | 0/3 | Not started | - |
 | 2. E-Commerce Shell | 0/TBD | Not started | - |
 | 3. Fingerprint Capture | 0/TBD | Not started | - |
 | 4. Detection Engine | 0/TBD | Not started | - |
