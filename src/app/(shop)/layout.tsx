@@ -1,6 +1,7 @@
 import Link from "next/link"
 import { auth, signOut } from "@/lib/auth"
 import { redirect } from "next/navigation"
+import { FingerprintReporter } from "@/components/FingerprintReporter"
 
 export default async function ShopLayout({
   children,
@@ -58,6 +59,7 @@ export default async function ShopLayout({
         </div>
       </nav>
       <main className="mx-auto max-w-5xl px-6 py-8">{children}</main>
+      <FingerprintReporter />
     </div>
   )
 }
