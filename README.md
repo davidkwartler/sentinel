@@ -116,8 +116,8 @@ This walkthrough reproduces a session cookie theft and detection end-to-end.
 6. The dashboard shows the session with a red **FLAGGED** badge
 7. Click the flagged row to expand Claude's reasoning transcript
 
-> **FingerprintJS Pro note:** If the Pro account is inactive, the app falls back to OSS mode.
-> To force OSS mode manually: open DevTools -> Console -> run `localStorage.setItem('fpMode', 'oss')` -> reload.
+> **FingerprintJS Pro note:** The app defaults to OSS mode (open-source FingerprintJS).
+> To switch to Pro mode, go to `/profile` and toggle **Fingerprint Mode** to Pro.
 > In OSS mode, fingerprints are less stable but the detection pipeline still functions for demo purposes.
 
 ## Running Tests
@@ -143,7 +143,7 @@ and `POST /api/session/record` response shapes (401 auth guard, 400 validation, 
 ```
 src/
 ├── app/
-│   ├── (shop)/           # Auth-gated route group
+│   ├── (shop)/           # Auth-aware route group (guests can browse; cart + fingerprinting require auth)
 │   │   ├── layout.tsx    # Shared nav + FingerprintReporter
 │   │   ├── products/     # Product listing
 │   │   ├── profile/      # User profile
