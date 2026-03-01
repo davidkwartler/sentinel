@@ -11,7 +11,8 @@ export default async function ShopLayout({
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <nav className="border-b border-gray-200 bg-white">
+      <a href="#main-content" className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-2 focus:z-50 focus:rounded-md focus:bg-white focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:text-gray-900 focus:shadow-md">Skip to main content</a>
+      <nav aria-label="Main navigation" className="border-b border-gray-200 bg-white">
         <div className="mx-auto flex h-14 max-w-5xl items-center justify-between px-4 sm:px-6">
           <div className="flex items-center gap-3 sm:gap-6">
             <Link
@@ -80,7 +81,7 @@ export default async function ShopLayout({
           </div>
         </div>
       </nav>
-      <main className="mx-auto max-w-5xl px-6 py-8">{children}</main>
+      <main id="main-content" className="mx-auto max-w-5xl px-6 py-8">{children}</main>
       {session && <FingerprintReporter />}
     </div>
   )

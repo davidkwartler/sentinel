@@ -21,7 +21,7 @@ export function LoginModal({ signInAction }: { signInAction: () => void }) {
   if (!show) return null
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+    <div role="dialog" aria-modal="true" aria-label="Sign in to Sentinel" className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
       <div className="relative w-full max-w-sm rounded-xl border border-gray-200 bg-white p-8 shadow-lg">
         <button
           onClick={dismiss}

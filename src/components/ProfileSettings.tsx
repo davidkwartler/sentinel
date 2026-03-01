@@ -64,6 +64,7 @@ export function ProfileSettings() {
             <button
               key={mode}
               onClick={() => handleFpModeChange(mode)}
+              aria-pressed={fpMode === mode}
               className={`rounded-md px-4 py-2 text-sm font-medium transition-colors ${
                 fpMode === mode
                   ? "bg-gray-900 text-white"
@@ -93,6 +94,7 @@ export function ProfileSettings() {
               key={opt.value}
               onClick={() => MODEL_PICKER_ENABLED && handleModelChange(opt.value)}
               disabled={!MODEL_PICKER_ENABLED}
+              aria-pressed={model === opt.value}
               className={`rounded-md px-4 py-2 text-sm font-medium transition-colors ${
                 MODEL_PICKER_ENABLED
                   ? model === opt.value
