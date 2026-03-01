@@ -103,6 +103,7 @@ Plans:
   3. A simulation walkthrough (README or docs page) describes the exact steps to reproduce a hijack detection: Device A login, cookie copy from DevTools, Device B cookie paste, dashboard flag observation
   4. The deployed app does not expose raw session cookie values through any API endpoint
   5. README.md exists at the repo root and includes: project description with live Vercel URL, architecture overview, prerequisites, step-by-step local setup instructions (clone → env vars → DB → dev server), a populated .env.local template showing every required variable with comments explaining where to get each credential (Google OAuth, FingerprintJS Pro, Anthropic, Neon), and the hijack simulation walkthrough
+  6. Unit and integration tests are added across the project — at minimum: computeSimilarity edge cases, runDetection transaction logic (mocked DB), route handler response shapes, and auth guard behavior. Use the project's test framework (or add vitest if none exists). Tests should pass in CI.
 **Plans**: TBD
 
 ## Progress
@@ -115,7 +116,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
 | 1. Foundation | ✅ | Done | 2026-02-28 |
 | 2. E-Commerce Shell | ✅ | Done | 2026-02-28 |
 | 3. Fingerprint Capture | ✅ | Done | 2026-02-28 |
-| 4. Detection Engine | 0/2 | In progress | - |
+| 4. Detection Engine | 2/2 | Done | 2026-02-28 |
 | 5. Claude Integration | 0/TBD | Not started | - |
 | 6. Security Dashboard | 0/TBD | Not started | - |
 | 7. Deploy and Polish | 0/TBD | Not started | - |
