@@ -1,9 +1,13 @@
 import { auth } from "@/lib/auth"
+import { redirect } from "next/navigation"
 import { ProfileSettings } from "@/components/ProfileSettings"
 
 export default async function ProfilePage() {
-  // Layout guarantees auth — session is always present here
-  const session = (await auth())!
+  const session = await auth()
+
+  if (!session) {
+    redirect("/login")
+  }
 
   const { user } = session
 
