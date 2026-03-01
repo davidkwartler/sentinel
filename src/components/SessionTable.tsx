@@ -13,6 +13,12 @@ type FingerprintRow = {
   visitorId: string
   ip: string | null
   userAgent: string | null
+  os: string | null
+  browser: string | null
+  screenRes: string | null
+  timezone: string | null
+  isOriginal: boolean
+  createdAt: Date | string
 }
 
 type SessionRow = {
@@ -22,109 +28,219 @@ type SessionRow = {
 }
 
 export function SessionTable({ sessions }: { sessions: SessionRow[] }) {
-  const [expandedId, setExpandedId] = useState<string | null>(null)
+  const firstFlagged = sessions.find(
+    (s) => s.detectionEvents[0]?.status === "FLAGGED" && s.detectionEvents[0]?.reasoning,
+  )
+  const [expandedId, setExpandedId] = useState<string | null>(firstFlagged?.id ?? null)
+  const [showFingerprints, setShowFingerprints] = useState<string | null>(null)
 
-  function toggle(id: string) {
+  function toggleAnalysis(id: string) {
     setExpandedId((prev) => (prev === id ? null : id))
+  }
+
+  function toggleFingerprints(id: string) {
+    setShowFingerprints((prev) => (prev === id ? null : id))
   }
 
   if (sessions.length === 0) {
     return (
-      <div className="rounded-lg border border-gray-200 bg-white p-8 text-center text-sm text-gray-400 shadow-sm">
-        No active sessions found.
+      <div className="rounded-lg border border-gray-200 bg-white p-12 text-center shadow-sm">
+        <p className="text-3xl">🛡️</p>
+        <p className="mt-3 text-sm font-medium text-gray-700">
+          No detection events yet
+        </p>
+        <p className="mt-1 text-xs text-gray-400">
+          Browse the site normally, then try the hijack simulation from the
+          README to see detection in action.
+        </p>
       </div>
     )
   }
 
   return (
-    <div className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
-      <table className="w-full text-sm">
-        <thead className="bg-gray-50 text-xs uppercase tracking-wide text-gray-500">
-          <tr>
-            <th className="px-4 py-3 text-left">Visitor ID</th>
-            <th className="px-4 py-3 text-left">IP Address</th>
-            <th className="px-4 py-3 text-left">User Agent</th>
-            <th className="px-4 py-3 text-left">Status</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-gray-100">
-          {sessions.map((session) => {
-            const fp = session.fingerprints[0]
-            const event = session.detectionEvents[0]
-            const status = event?.status ?? "ACTIVE"
-            const isFlagged = status === "FLAGGED"
-            const isExpanded = expandedId === session.id
+    <div className="space-y-4">
+      {sessions.map((session) => {
+        // Deduplicate fingerprints by visitorId, keeping the first (earliest) of each
+        const uniqueFps = session.fingerprints.filter(
+          (f, i, arr) => arr.findIndex((x) => x.visitorId === f.visitorId) === i,
+        )
+        const fp = uniqueFps.find((f) => f.isOriginal) ?? uniqueFps[0]
+        const event = session.detectionEvents[0]
+        const status = event?.status ?? "ACTIVE"
+        const hasAnalysis = !!event?.reasoning
+        const isAnalysisOpen = expandedId === session.id
+        const isFingerprintsOpen = showFingerprints === session.id
+        const fpCount = uniqueFps.length
 
-            return (
-              <SessionRowFragment
-                key={session.id}
-                sessionId={session.id}
-                fp={fp}
-                event={event ?? null}
-                status={status}
-                isFlagged={isFlagged}
-                isExpanded={isExpanded}
-                onToggle={toggle}
-              />
-            )
-          })}
-        </tbody>
-      </table>
+        const confidenceColor =
+          event?.confidenceScore != null
+            ? event.confidenceScore >= 70
+              ? "bg-red-100 text-red-700"
+              : event.confidenceScore >= 40
+                ? "bg-yellow-100 text-yellow-700"
+                : "bg-green-100 text-green-700"
+            : ""
+
+        const analysisBg =
+          status === "FLAGGED"
+            ? "bg-red-50 border-red-100"
+            : status === "CLEAR"
+              ? "bg-green-50 border-green-100"
+              : "bg-yellow-50 border-yellow-100"
+
+        return (
+          <div
+            key={session.id}
+            className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm"
+          >
+            {/* Main row */}
+            <div className="flex items-center justify-between px-4 py-3 sm:px-5">
+              <div className="flex items-center gap-4 overflow-hidden">
+                <StatusBadge status={status} />
+                <div className="min-w-0">
+                  <p className="truncate font-mono text-xs text-gray-700">
+                    {fp?.visitorId ?? "\u2014"}
+                  </p>
+                  <p className="mt-0.5 text-xs text-gray-400">
+                    {fp?.ip ?? "No IP"}{" "}
+                    {fp?.browser && fp?.os ? `\u00B7 ${fp.browser} on ${fp.os}` : ""}
+                  </p>
+                </div>
+              </div>
+              <div className="flex shrink-0 items-center gap-2">
+                <button
+                  onClick={() => toggleFingerprints(session.id)}
+                  className="rounded-md border border-gray-200 px-2.5 py-1 text-xs text-gray-600 transition-colors hover:bg-gray-50"
+                >
+                  {isFingerprintsOpen
+                    ? "Hide"
+                    : fpCount > 1
+                      ? `Compare ${fpCount} fingerprints`
+                      : "View fingerprint"}
+                </button>
+                {hasAnalysis && (
+                  <button
+                    onClick={() => toggleAnalysis(session.id)}
+                    className="rounded-md border border-gray-200 px-2.5 py-1 text-xs text-gray-600 transition-colors hover:bg-gray-50"
+                  >
+                    {isAnalysisOpen ? "Hide" : "View"} analysis
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Fingerprint comparison */}
+            {isFingerprintsOpen && (
+              <div className="border-t border-gray-100 bg-gray-50 px-4 py-4 sm:px-5">
+                <p className="mb-3 text-xs font-medium uppercase tracking-wide text-gray-500">
+                  Fingerprint Comparison
+                </p>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {uniqueFps.map((f, i) => {
+                    const isOrig = f.isOriginal
+                    const isDiff = (field: keyof FingerprintRow) => {
+                      if (!fp || isOrig) return false
+                      return f[field] !== fp[field]
+                    }
+
+                    return (
+                      <div
+                        key={i}
+                        className={`rounded-md border p-3 text-xs ${
+                          isOrig
+                            ? "border-gray-200 bg-white"
+                            : "border-amber-200 bg-amber-50"
+                        }`}
+                      >
+                        <p className="mb-2 font-medium text-gray-700">
+                          {isOrig ? "Original" : "New Access"}
+                        </p>
+                        <div className="space-y-1">
+                          <FpField
+                            label="Visitor ID"
+                            value={f.visitorId}
+                            diff={isDiff("visitorId")}
+                            mono
+                          />
+                          <FpField
+                            label="IP"
+                            value={f.ip}
+                            diff={isDiff("ip")}
+                          />
+                          <FpField
+                            label="OS"
+                            value={f.os}
+                            diff={isDiff("os")}
+                          />
+                          <FpField
+                            label="Browser"
+                            value={f.browser}
+                            diff={isDiff("browser")}
+                          />
+                          <FpField
+                            label="Screen"
+                            value={f.screenRes}
+                            diff={isDiff("screenRes")}
+                          />
+                          <FpField
+                            label="Timezone"
+                            value={f.timezone}
+                            diff={isDiff("timezone")}
+                          />
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Analysis */}
+            {hasAnalysis && isAnalysisOpen && event && (
+              <div className={`border-t px-4 py-4 sm:px-5 ${analysisBg}`}>
+                <div className="flex items-start gap-3">
+                  {event.confidenceScore != null && (
+                    <span
+                      className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold ${confidenceColor}`}
+                    >
+                      {event.confidenceScore}/100
+                    </span>
+                  )}
+                  <p className="text-sm leading-relaxed text-gray-700">
+                    {event.reasoning}
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
+        )
+      })}
     </div>
   )
 }
 
-function SessionRowFragment({
-  sessionId,
-  fp,
-  event,
-  status,
-  isFlagged,
-  isExpanded,
-  onToggle,
+function FpField({
+  label,
+  value,
+  diff,
+  mono,
 }: {
-  sessionId: string
-  fp: FingerprintRow | undefined
-  event: DetectionEventRow | null
-  status: string
-  isFlagged: boolean
-  isExpanded: boolean
-  onToggle: (id: string) => void
+  label: string
+  value: string | null
+  diff: boolean
+  mono?: boolean
 }) {
   return (
-    <>
-      <tr
-        onClick={() => isFlagged && onToggle(sessionId)}
-        className={isFlagged ? "cursor-pointer hover:bg-red-50" : ""}
-        title={isFlagged ? "Click to view Claude's reasoning" : undefined}
+    <div className="flex justify-between gap-2">
+      <span className="text-gray-400">{label}</span>
+      <span
+        className={`truncate text-right ${
+          diff ? "font-medium text-red-600" : "text-gray-600"
+        } ${mono ? "font-mono" : ""}`}
       >
-        <td className="px-4 py-3 font-mono text-xs text-gray-700">
-          {fp?.visitorId ? fp.visitorId.slice(0, 12) + "…" : "—"}
-        </td>
-        <td className="px-4 py-3 text-gray-600">{fp?.ip ?? "—"}</td>
-        <td className="max-w-xs truncate px-4 py-3 text-xs text-gray-500">
-          {fp?.userAgent ?? "—"}
-        </td>
-        <td className="px-4 py-3">
-          <StatusBadge status={status} />
-        </td>
-      </tr>
-      {isFlagged && isExpanded && event && (
-        <tr>
-          <td
-            colSpan={4}
-            className="border-t border-red-100 bg-red-50 px-4 py-4"
-          >
-            <p className="mb-2 text-xs font-semibold text-red-700">
-              Confidence Score: {event.confidenceScore ?? "—"} / 100
-            </p>
-            <p className="text-sm leading-relaxed text-gray-700">
-              {event.reasoning ?? "No reasoning available."}
-            </p>
-          </td>
-        </tr>
-      )}
-    </>
+        {value ?? "\u2014"}
+      </span>
+    </div>
   )
 }
 

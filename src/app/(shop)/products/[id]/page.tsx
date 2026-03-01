@@ -1,6 +1,7 @@
 import Link from "next/link"
 import { notFound } from "next/navigation"
 import { products } from "../data"
+import { AddToCartButton } from "./AddToCartButton"
 
 export function generateStaticParams() {
   return products.map((product) => ({ id: String(product.id) }))
@@ -44,9 +45,7 @@ export default async function ProductDetailPage({
             <p className="mt-4 text-sm leading-relaxed text-gray-600">
               {product.description}
             </p>
-            <button className="mt-6 rounded-md bg-gray-900 px-6 py-2 text-sm font-medium text-white transition-colors hover:bg-gray-800">
-              Add to Cart
-            </button>
+            <AddToCartButton />
           </div>
         </div>
       </div>

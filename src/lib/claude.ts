@@ -67,7 +67,12 @@ export async function analyzeDetectionEvent(eventId: string, modelOverride?: str
       "- Different browser family (e.g. Chrome → Firefox)\n" +
       "- Dramatically different screen resolution indicating a different device class\n" +
       "- Different timezone combined with different IP suggesting geographically distant access\n\n" +
-      "Focus on device characteristics, not visitor ID alone.",
+      "Focus on device characteristics, not visitor ID alone.\n\n" +
+      "OUTPUT FORMAT:\n" +
+      "- Keep reasoning under 400 characters\n" +
+      "- Use bullet points (• ) to list key findings\n" +
+      "- Be concise and direct — state what changed and what it means\n" +
+      "- Lead with the verdict (e.g. 'Likely hijack:' or 'Likely benign:')",
     messages: [
       {
         role: "user",
@@ -92,7 +97,7 @@ export async function analyzeDetectionEvent(eventId: string, modelOverride?: str
             },
             reasoning: {
               type: "string",
-              description: "Human-readable explanation of the confidence score",
+              description: "Concise bullet-point explanation, max 400 characters. Use • for bullets.",
             },
           },
           required: ["confidenceScore", "reasoning"],

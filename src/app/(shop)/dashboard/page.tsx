@@ -14,12 +14,17 @@ export default async function DashboardPage() {
       id: true,
       expires: true,
       fingerprints: {
-        where: { isOriginal: true },
-        take: 1,
+        orderBy: { createdAt: "asc" },
         select: {
           visitorId: true,
           ip: true,
           userAgent: true,
+          os: true,
+          browser: true,
+          screenRes: true,
+          timezone: true,
+          isOriginal: true,
+          createdAt: true,
         },
       },
       detectionEvents: {

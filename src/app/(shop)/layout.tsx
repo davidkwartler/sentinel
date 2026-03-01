@@ -17,13 +17,14 @@ export default async function ShopLayout({
   return (
     <div className="min-h-screen bg-gray-50">
       <nav className="border-b border-gray-200 bg-white">
-        <div className="mx-auto flex h-14 max-w-5xl items-center justify-between px-6">
-          <div className="flex items-center gap-6">
+        <div className="mx-auto flex h-14 max-w-5xl items-center justify-between px-4 sm:px-6">
+          <div className="flex items-center gap-3 sm:gap-6">
             <Link
               href="/products"
               className="text-sm font-semibold text-gray-900"
             >
-              Sentinel
+              <span className="sm:hidden">🛡️</span>
+              <span className="hidden sm:inline">🛡️ Sentinel</span>
             </Link>
             <Link
               href="/products"
@@ -32,22 +33,29 @@ export default async function ShopLayout({
               Products
             </Link>
             <Link
-              href="/profile"
-              className="text-sm text-gray-600 hover:text-gray-900"
-            >
-              Profile
-            </Link>
-            <Link
               href="/dashboard"
               className="text-sm text-gray-600 hover:text-gray-900"
             >
               Dashboard
             </Link>
           </div>
-          <div className="flex items-center gap-4">
-            <span className="text-xs text-gray-400">
-              {session.user?.email}
-            </span>
+          <div className="flex items-center gap-3 sm:gap-4">
+            <Link href="/profile" className="flex items-center gap-2">
+              {session.user?.image ? (
+                <img
+                  src={session.user.image}
+                  alt=""
+                  className="h-7 w-7 rounded-full"
+                />
+              ) : (
+                <div className="flex h-7 w-7 items-center justify-center rounded-full bg-gray-100 text-xs text-gray-400">
+                  {session.user?.name?.[0] ?? "?"}
+                </div>
+              )}
+              <span className="hidden text-sm text-gray-600 hover:text-gray-900 sm:inline">
+                Account
+              </span>
+            </Link>
             <form
               action={async () => {
                 "use server"
