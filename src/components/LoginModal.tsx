@@ -72,8 +72,7 @@ export function LoginModal({ signInAction }: { signInAction: () => void }) {
                 1
               </span>
               <p className="text-xs leading-relaxed text-gray-500 pt-0.5">
-                Sign in and browse products. We'll record your browser
-                fingerprint with FingerprintJS
+                Sign in and browse products, we'll record your device fingerprint
               </p>
             </div>
             <div className="flex items-start gap-3">
@@ -81,7 +80,7 @@ export function LoginModal({ signInAction }: { signInAction: () => void }) {
                 2
               </span>
               <p className="text-xs leading-relaxed text-gray-500 pt-0.5">
-                We detect if your session cookie is used from a different device
+                We detect if the same session is used from multiple devices
               </p>
             </div>
             <div className="flex items-start gap-3">
@@ -89,7 +88,7 @@ export function LoginModal({ signInAction }: { signInAction: () => void }) {
                 3
               </span>
               <p className="text-xs leading-relaxed text-gray-500 pt-0.5">
-                Claude analyzes your sessions and flags suspicious access
+                Claude investigates and flags suspicious sessions
               </p>
             </div>
           </div>
