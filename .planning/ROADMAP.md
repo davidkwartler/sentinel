@@ -16,7 +16,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 2: E-Commerce Shell** - Auth-gated product and profile pages giving the session realistic surface area
 - [x] **Phase 3: Fingerprint Capture** - FingerprintJS Pro client + server ingest with deduplication; fingerprint tuples written to database
 - [ ] **Phase 4: Detection Engine** - Mismatch detection comparing new fingerprint tuples against stored originals; detection events persisted
-- [ ] **Phase 5: Claude Integration** - Async Claude API call on confirmed mismatch returning structured confidence score and reasoning
+- [x] **Phase 5: Claude Integration** - Async Claude API call on confirmed mismatch returning structured confidence score and reasoning
 - [ ] **Phase 6: Security Dashboard** - Authenticated session table with fingerprint summaries, confidence scores, flag badges, and expandable reasoning
 - [ ] **Phase 7: Deploy and Polish** - Vercel production deployment with all env vars, simulation walkthrough documentation, configurable threshold
 
@@ -117,7 +117,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
 | 2. E-Commerce Shell | ✅ | Done | 2026-02-28 |
 | 3. Fingerprint Capture | ✅ | Done | 2026-02-28 |
 | 4. Detection Engine | 2/2 | Done | 2026-02-28 |
-| 5. Claude Integration | 0/TBD | Not started | - |
+| 5. Claude Integration | 2/2 | Done | 2026-02-28 |
 | 6. Security Dashboard | 0/TBD | Not started | - |
 | 7. Deploy and Polish | 0/TBD | Not started | - |
 
