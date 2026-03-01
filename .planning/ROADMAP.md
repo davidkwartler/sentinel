@@ -94,7 +94,7 @@ Plans:
 **Plans**: TBD
 
 ### Phase 7: Deploy and Polish
-**Goal**: Sentinel runs on Vercel production with all secrets configured as environment variables, and a simulation walkthrough enables anyone to reproduce the hijack detection demo end-to-end
+**Goal**: Sentinel runs on Vercel production with all secrets configured as environment variables, a simulation walkthrough enables anyone to reproduce the hijack detection demo end-to-end, and a polished README enables anyone to fork, configure, and run the project themselves
 **Depends on**: Phase 6
 **Requirements**: None (all 20 v1 requirements covered in Phases 1-6; this phase validates the full system in the production environment)
 **Success Criteria** (what must be TRUE):
@@ -102,6 +102,7 @@ Plans:
   2. All secrets (GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, FINGERPRINTJS_API_KEY, ANTHROPIC_API_KEY, ANTHROPIC_MODEL, NEXTAUTH_SECRET) are configured as Vercel environment variables and the app starts without any missing-env errors
   3. A simulation walkthrough (README or docs page) describes the exact steps to reproduce a hijack detection: Device A login, cookie copy from DevTools, Device B cookie paste, dashboard flag observation
   4. The deployed app does not expose raw session cookie values through any API endpoint
+  5. README.md exists at the repo root and includes: project description with live Vercel URL, architecture overview, prerequisites, step-by-step local setup instructions (clone → env vars → DB → dev server), a populated .env.local template showing every required variable with comments explaining where to get each credential (Google OAuth, FingerprintJS Pro, Anthropic, Neon), and the hijack simulation walkthrough
 **Plans**: TBD
 
 ## Progress
