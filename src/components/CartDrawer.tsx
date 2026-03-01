@@ -10,13 +10,13 @@ export function CartDrawer() {
 
   return (
     <>
-      {/* Cart button — top right of content area */}
-      <div className="flex justify-end mb-4">
+      {/* Cart button — floated top right, aligned with page heading */}
+      <div className="float-right">
         <button
           onClick={() => setOpen(true)}
           className="relative rounded-md border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-700 shadow-sm transition-colors hover:bg-gray-50"
         >
-          Cart
+          🛒 Cart
           {totalItems > 0 && (
             <span className="absolute -right-2 -top-2 flex h-5 w-5 items-center justify-center rounded-full bg-gray-900 text-[10px] font-medium text-white">
               {totalItems}

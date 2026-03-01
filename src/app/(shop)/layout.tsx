@@ -32,7 +32,7 @@ export default async function ShopLayout({
                 href="/dashboard"
                 className="text-sm text-gray-600 hover:text-gray-900"
               >
-                Dashboard
+                Sessions
               </Link>
             )}
           </div>
@@ -58,7 +58,7 @@ export default async function ShopLayout({
                 <form
                   action={async () => {
                     "use server"
-                    await signOut({ redirectTo: "/login" })
+                    await signOut({ redirectTo: "/products" })
                   }}
                 >
                   <button
@@ -74,7 +74,7 @@ export default async function ShopLayout({
                 href="/login"
                 className="rounded-md bg-gray-900 px-4 py-1.5 text-sm font-medium text-white transition-colors hover:bg-gray-800"
               >
-                Sign in
+                🔐 Sign in
               </Link>
             )}
           </div>
