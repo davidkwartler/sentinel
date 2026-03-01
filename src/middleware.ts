@@ -4,10 +4,7 @@ import type { NextRequest } from "next/server"
 export function middleware(request: NextRequest) {
   const response = NextResponse.next()
 
-  if (
-    request.nextUrl.pathname === "/login" &&
-    !request.cookies.get("auth_session")
-  ) {
+  if (!request.cookies.get("auth_session")) {
     response.cookies.set("auth_session", "anonymous", {
       httpOnly: true,
       sameSite: "lax",
@@ -20,5 +17,7 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/login"],
+  matcher: [
+    "/((?!_next/static|_next/image|favicon\\.ico|api/auth).*)",
+  ],
 }
