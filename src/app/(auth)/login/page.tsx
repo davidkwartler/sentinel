@@ -1,6 +1,16 @@
+import { cookies } from "next/headers"
 import { signIn } from "@/lib/auth"
 
-export default function LoginPage() {
+export default async function LoginPage() {
+  const cookieStore = await cookies()
+  if (!cookieStore.get("auth_session")) {
+    cookieStore.set("auth_session", "anonymous", {
+      httpOnly: true,
+      sameSite: "lax",
+      path: "/",
+      secure: process.env.NODE_ENV === "production",
+    })
+  }
   return (
     <main className="flex min-h-screen items-center justify-center bg-gray-50">
       <div className="w-full max-w-sm rounded-xl border border-gray-200 bg-white p-8 shadow-sm">
