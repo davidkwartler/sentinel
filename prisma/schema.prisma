@@ -41,7 +41,8 @@ model Session {
   userId       String
   expires      DateTime
   user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  fingerprints Fingerprint[]
+  fingerprints    Fingerprint[]
+  detectionEvents DetectionEvent[]
 }
 
 model Fingerprint {
@@ -69,4 +70,19 @@ model VerificationToken {
   expires    DateTime
 
   @@unique([identifier, token])
+}
+
+model DetectionEvent {
+  id                String   @id @default(cuid())
+  createdAt         DateTime @default(now())
+  sessionId         String
+  originalVisitorId String
+  newVisitorId      String
+  originalIp        String?
+  newIp             String?
+  similarityScore   Float
+  status            String   @default("PENDING")
+  session           Session  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId])
 }

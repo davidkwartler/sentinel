@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/db"
 import { z } from "zod"
+import { runDetection } from "@/lib/detection"
 
 const fingerprintSchema = z.object({
   visitorId: z.string().min(1),
@@ -70,5 +71,21 @@ export async function POST(request: NextRequest) {
     },
   })
 
-  return NextResponse.json({ status: "ok", id: fingerprint.id })
+  // Run detection: compare new fingerprint against session's original
+  const detectionResult = await runDetection({
+    sessionId: dbSession.id,
+    newVisitorId: data.visitorId,
+    newIp: ip,
+    os: data.os ?? null,
+    browser: data.browser ?? null,
+    screenRes: data.screenRes ?? null,
+    timezone: data.timezone ?? null,
+  })
+
+  return NextResponse.json({
+    status: "ok",
+    id: fingerprint.id,
+    detected: detectionResult.detected,
+    eventId: detectionResult.eventId ?? null,
+  })
 }
