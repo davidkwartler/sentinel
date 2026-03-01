@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect } from "react"
+import { useEffect, useState } from "react"
 import {
   FingerprintJSPro,
   type ExtendedGetResult,
@@ -25,11 +25,21 @@ function parseUserAgent(ua: string): { os: string; browser: string } {
   return { os, browser }
 }
 
+type FpStatus = "idle" | "capturing" | "done" | "cached"
+
 export function FingerprintReporter() {
+  const [status, setStatus] = useState<FpStatus>("idle")
+  const [visible, setVisible] = useState(false)
+
   useEffect(() => {
     const cached = sessionStorage.getItem(CACHE_KEY)
     const ttl = Number(process.env.NEXT_PUBLIC_FINGERPRINT_TTL_MS ?? 1_800_000)
-    if (cached && Date.now() - Number(cached) < ttl) return
+    if (cached && Date.now() - Number(cached) < ttl) {
+      setStatus("cached")
+      setVisible(true)
+      const timer = setTimeout(() => setVisible(false), 2000)
+      return () => clearTimeout(timer)
+    }
 
     const fpMode = localStorage.getItem("sentinel_fp_mode") || "oss"
     const modelOverride =
@@ -84,6 +94,9 @@ export function FingerprintReporter() {
 
     async function capture() {
       try {
+        setStatus("capturing")
+        setVisible(true)
+
         const payload =
           fpMode === "oss" ? await captureOss() : await capturePro()
         if (!payload || cancelled) return
@@ -96,9 +109,14 @@ export function FingerprintReporter() {
 
         if (res.ok) {
           sessionStorage.setItem(CACHE_KEY, String(Date.now()))
+          if (!cancelled) {
+            setStatus("done")
+            setTimeout(() => setVisible(false), 3000)
+          }
         }
       } catch (err) {
         console.error("[Sentinel] Fingerprint capture failed:", err)
+        if (!cancelled) setVisible(false)
       }
     }
 
@@ -109,5 +127,28 @@ export function FingerprintReporter() {
     }
   }, [])
 
-  return null
+  if (!visible) return null
+
+  return (
+    <div className="fixed bottom-4 right-4 z-50 flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-xs shadow-md transition-opacity">
+      {status === "capturing" && (
+        <>
+          <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-gray-300 border-t-gray-600" />
+          <span className="text-gray-600">Registering fingerprint…</span>
+        </>
+      )}
+      {status === "done" && (
+        <>
+          <span className="text-green-600">✓</span>
+          <span className="text-gray-600">Fingerprint registered</span>
+        </>
+      )}
+      {status === "cached" && (
+        <>
+          <span className="text-green-600">✓</span>
+          <span className="text-gray-400">Fingerprint on file</span>
+        </>
+      )}
+    </div>
+  )
 }
