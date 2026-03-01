@@ -47,7 +47,7 @@ export function ProfileSettings() {
   if (!mounted) return null
 
   return (
-    <div className="mt-6 max-w-md space-y-6">
+    <div className="space-y-4">
       <h2 className="text-lg font-semibold text-gray-900">Settings</h2>
 
       {/* Fingerprint Mode */}
