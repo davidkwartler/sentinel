@@ -88,7 +88,12 @@ export async function POST(request: NextRequest) {
     const eventId = detectionResult.eventId
     after(async () => {
       try {
-        await analyzeDetectionEvent(eventId, data.modelOverride)
+        const allowModelOverride =
+          process.env.NEXT_PUBLIC_MODEL_PICKER_ENABLED === "true"
+        await analyzeDetectionEvent(
+          eventId,
+          allowModelOverride ? data.modelOverride : undefined,
+        )
       } catch (err) {
         console.error("[claude] analyzeDetectionEvent failed for event", eventId, err)
       }

@@ -9,7 +9,7 @@ export async function analyzeDetectionEvent(eventId: string, modelOverride?: str
   const event = await prisma.detectionEvent.findUnique({ where: { id: eventId } })
   if (!event) return
 
-  const model = modelOverride ?? process.env.ANTHROPIC_MODEL ?? "claude-sonnet-4-6"
+  const model = modelOverride ?? process.env.ANTHROPIC_MODEL ?? "claude-haiku-4-5"
 
   const response = await anthropic.messages.create({
     model,

@@ -14,6 +14,9 @@ const MODEL_OPTIONS = [
   { value: "claude-opus-4-6", label: "Opus 4.6" },
 ] as const
 
+const MODEL_PICKER_ENABLED =
+  process.env.NEXT_PUBLIC_MODEL_PICKER_ENABLED === "true"
+
 export function ProfileSettings() {
   const [fpMode, setFpMode] = useState<FpMode>("pro")
   const [model, setModel] = useState("claude-sonnet-4-6")
@@ -77,12 +80,19 @@ export function ProfileSettings() {
       <div className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
         <p className="mb-1 text-sm font-medium text-gray-900">Claude Model</p>
         <p className="mb-3 text-xs text-gray-500">
-          Which model analyzes detection events.
+          {MODEL_PICKER_ENABLED
+            ? "Which model analyzes detection events."
+            : "Model selection is disabled in this environment."}
         </p>
         <select
-          value={model}
+          value={MODEL_PICKER_ENABLED ? model : "claude-haiku-4-5"}
           onChange={(e) => handleModelChange(e.target.value)}
-          className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-gray-500 focus:outline-none focus:ring-1 focus:ring-gray-500"
+          disabled={!MODEL_PICKER_ENABLED}
+          className={`w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-gray-500 focus:outline-none focus:ring-1 focus:ring-gray-500 ${
+            MODEL_PICKER_ENABLED
+              ? "bg-white text-gray-900"
+              : "cursor-not-allowed bg-gray-100 text-gray-400"
+          }`}
         >
           {MODEL_OPTIONS.map((opt) => (
             <option key={opt.value} value={opt.value}>
