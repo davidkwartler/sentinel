@@ -19,7 +19,7 @@ const MODEL_PICKER_ENABLED =
 
 export function ProfileSettings() {
   const [fpMode, setFpMode] = useState<FpMode>("oss")
-  const [model, setModel] = useState("claude-sonnet-4-6")
+  const [model, setModel] = useState("claude-haiku-4-5")
   const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
@@ -27,7 +27,9 @@ export function ProfileSettings() {
       (localStorage.getItem(FP_MODE_KEY) as FpMode) || "oss",
     )
     setModel(
-      localStorage.getItem(MODEL_KEY) || "claude-sonnet-4-6",
+      MODEL_PICKER_ENABLED
+        ? localStorage.getItem(MODEL_KEY) || "claude-haiku-4-5"
+        : "claude-haiku-4-5",
     )
     setMounted(true)
   }, [])
@@ -48,19 +50,17 @@ export function ProfileSettings() {
 
   return (
     <div className="space-y-4">
-      <h2 className="text-lg font-semibold text-gray-900">Settings</h2>
-
       {/* Fingerprint Mode */}
       <div className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
         <p className="mb-1 text-sm font-medium text-gray-900">
-          Fingerprint Mode
+          Device Fingerprinting
         </p>
         <p className="mb-3 text-xs text-gray-500">
-          Open source mode works without an API key but produces less stable
-          fingerprints.
+          Identifies unique devices accessing the product page, so we can
+          detect suspicious session activity.
         </p>
         <div className="flex gap-2">
-          {(["pro", "oss"] as const).map((mode) => (
+          {(["oss", "pro"] as const).map((mode) => (
             <button
               key={mode}
               onClick={() => handleFpModeChange(mode)}
@@ -74,32 +74,43 @@ export function ProfileSettings() {
             </button>
           ))}
         </div>
+        <p className="mt-2 text-[11px] italic text-gray-400">
+          FingerprintJS open source by default, use Pro with an API key for
+          improved accuracy.
+        </p>
       </div>
 
       {/* Claude Model */}
       <div className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
-        <p className="mb-1 text-sm font-medium text-gray-900">Claude Model</p>
+        <p className="mb-1 text-sm font-medium text-gray-900">GenAI Analysis</p>
         <p className="mb-3 text-xs text-gray-500">
-          {MODEL_PICKER_ENABLED
-            ? "Which model analyzes detection events."
-            : "Model selection is disabled in this environment."}
+          Reviews fingerprint mismatches and determines if a session hijack
+          has occurred.
         </p>
-        <select
-          value={MODEL_PICKER_ENABLED ? model : "claude-haiku-4-5"}
-          onChange={(e) => handleModelChange(e.target.value)}
-          disabled={!MODEL_PICKER_ENABLED}
-          className={`w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-gray-500 focus:outline-none focus:ring-1 focus:ring-gray-500 ${
-            MODEL_PICKER_ENABLED
-              ? "bg-white text-gray-900"
-              : "cursor-not-allowed bg-gray-100 text-gray-400"
-          }`}
-        >
+        <div className="flex gap-2">
           {MODEL_OPTIONS.map((opt) => (
-            <option key={opt.value} value={opt.value}>
+            <button
+              key={opt.value}
+              onClick={() => MODEL_PICKER_ENABLED && handleModelChange(opt.value)}
+              disabled={!MODEL_PICKER_ENABLED}
+              className={`rounded-md px-4 py-2 text-sm font-medium transition-colors ${
+                MODEL_PICKER_ENABLED
+                  ? model === opt.value
+                    ? "bg-gray-900 text-white"
+                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                  : model === opt.value
+                    ? "cursor-not-allowed bg-gray-200 text-gray-400"
+                    : "cursor-not-allowed bg-gray-50 text-gray-300"
+              }`}
+            >
               {opt.label}
-            </option>
+            </button>
           ))}
-        </select>
+        </div>
+        <p className="mt-2 text-[11px] italic text-gray-400">
+          Claude Haiku by default, use Opus for best results.
+          {!MODEL_PICKER_ENABLED && " Model selection is disabled in this environment."}
+        </p>
       </div>
     </div>
   )

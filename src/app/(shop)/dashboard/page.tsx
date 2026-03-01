@@ -43,12 +43,14 @@ export default async function DashboardPage() {
 
   return (
     <div>
-      <PollingRefresher intervalMs={8000} />
-      <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-2xl font-semibold text-gray-900">
-          Security Dashboard
+      <PollingRefresher intervalMs={5000} />
+      <div className="mb-6">
+        <h1 className="mb-1 text-2xl font-semibold text-gray-900">
+          Session Monitoring
         </h1>
-        <p className="text-xs text-gray-400">Auto-refreshes every 8 seconds</p>
+        <p className="text-sm text-gray-500">
+          Active sessions and detected fingerprint mismatches.
+        </p>
       </div>
       <SessionTable sessions={sessions} />
     </div>

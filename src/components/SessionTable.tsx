@@ -133,7 +133,7 @@ export function SessionTable({ sessions }: { sessions: SessionRow[] }) {
             {isFingerprintsOpen && (
               <div className="border-t border-gray-100 bg-gray-50 px-4 py-4 sm:px-5">
                 <p className="mb-3 text-xs font-medium uppercase tracking-wide text-gray-500">
-                  Fingerprint Comparison
+                  Session Fingerprints
                 </p>
                 <div className="grid gap-3 sm:grid-cols-2">
                   {uniqueFps.map((f, i) => {
