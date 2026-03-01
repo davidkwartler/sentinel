@@ -110,6 +110,7 @@ export function SessionTable({ sessions }: { sessions: SessionRow[] }) {
               <div className="flex shrink-0 items-center gap-2">
                 <button
                   onClick={() => toggleFingerprints(session.id)}
+                  aria-expanded={isFingerprintsOpen}
                   className="rounded-md border border-gray-200 px-2.5 py-1 text-xs text-gray-600 transition-colors hover:bg-gray-50"
                 >
                   {isFingerprintsOpen
@@ -121,6 +122,7 @@ export function SessionTable({ sessions }: { sessions: SessionRow[] }) {
                 {hasAnalysis && (
                   <button
                     onClick={() => toggleAnalysis(session.id)}
+                    aria-expanded={isAnalysisOpen}
                     className="rounded-md border border-gray-200 px-2.5 py-1 text-xs text-gray-600 transition-colors hover:bg-gray-50"
                   >
                     {isAnalysisOpen ? "Hide" : "View"} analysis

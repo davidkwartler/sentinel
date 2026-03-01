@@ -14,6 +14,7 @@ export function CartDrawer() {
       <div className="float-right">
         <button
           onClick={() => setOpen(true)}
+          aria-label={totalItems > 0 ? `Cart, ${totalItems} items` : "Cart"}
           className="relative rounded-md border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-700 shadow-sm transition-colors hover:bg-gray-50"
         >
           🛒 Cart
@@ -35,6 +36,9 @@ export function CartDrawer() {
 
       {/* Drawer */}
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="Shopping cart"
         className={`fixed right-0 top-0 z-50 flex h-full w-full max-w-sm flex-col border-l border-gray-200 bg-white shadow-xl transition-transform duration-200 ${
           open ? "translate-x-0" : "translate-x-full"
         }`}
@@ -45,6 +49,7 @@ export function CartDrawer() {
           </h2>
           <button
             onClick={() => setOpen(false)}
+            aria-label="Close cart"
             className="text-gray-400 hover:text-gray-600"
           >
             ✕
@@ -75,6 +80,7 @@ export function CartDrawer() {
                   <div className="flex items-center gap-1.5">
                     <button
                       onClick={() => updateQty(item.id, item.qty - 1)}
+                      aria-label="Decrease quantity"
                       className="flex h-6 w-6 items-center justify-center rounded border border-gray-200 text-xs text-gray-600 hover:bg-gray-50"
                     >
                       −
@@ -84,6 +90,7 @@ export function CartDrawer() {
                     </span>
                     <button
                       onClick={() => updateQty(item.id, item.qty + 1)}
+                      aria-label="Increase quantity"
                       className="flex h-6 w-6 items-center justify-center rounded border border-gray-200 text-xs text-gray-600 hover:bg-gray-50"
                     >
                       +
@@ -91,6 +98,7 @@ export function CartDrawer() {
                   </div>
                   <button
                     onClick={() => removeItem(item.id)}
+                    aria-label="Remove item"
                     className="text-xs text-gray-400 hover:text-red-500"
                   >
                     ✕
