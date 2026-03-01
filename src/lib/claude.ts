@@ -5,11 +5,11 @@ const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
 })
 
-export async function analyzeDetectionEvent(eventId: string): Promise<void> {
+export async function analyzeDetectionEvent(eventId: string, modelOverride?: string): Promise<void> {
   const event = await prisma.detectionEvent.findUnique({ where: { id: eventId } })
   if (!event) return
 
-  const model = process.env.ANTHROPIC_MODEL ?? "claude-sonnet-4-6"
+  const model = modelOverride ?? process.env.ANTHROPIC_MODEL ?? "claude-sonnet-4-6"
 
   const response = await anthropic.messages.create({
     model,

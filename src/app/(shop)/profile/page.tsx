@@ -1,4 +1,5 @@
 import { auth } from "@/lib/auth"
+import { ProfileSettings } from "@/components/ProfileSettings"
 
 export default async function ProfilePage() {
   // Layout guarantees auth — session is always present here
@@ -43,6 +44,7 @@ export default async function ProfilePage() {
           </div>
         </div>
       </div>
+      <ProfileSettings />
     </div>
   )
 }

@@ -12,6 +12,7 @@ const fingerprintSchema = z.object({
   browser: z.string().optional(),
   screenRes: z.string().optional(),
   timezone: z.string().optional(),
+  modelOverride: z.string().optional(),
 })
 
 export async function POST(request: NextRequest) {
@@ -87,7 +88,7 @@ export async function POST(request: NextRequest) {
     const eventId = detectionResult.eventId
     after(async () => {
       try {
-        await analyzeDetectionEvent(eventId)
+        await analyzeDetectionEvent(eventId, data.modelOverride)
       } catch (err) {
         console.error("[claude] analyzeDetectionEvent failed for event", eventId, err)
       }
