@@ -45,7 +45,7 @@ export default async function ProductDetailPage({
             <p className="mt-4 text-sm leading-relaxed text-gray-600">
               {product.description}
             </p>
-            <AddToCartButton />
+            <AddToCartButton product={{ id: product.id, name: product.name, price: product.price, image: product.image }} />
           </div>
         </div>
       </div>
