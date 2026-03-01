@@ -37,6 +37,12 @@ export default async function ShopLayout({
             >
               Profile
             </Link>
+            <Link
+              href="/dashboard"
+              className="text-sm text-gray-600 hover:text-gray-900"
+            >
+              Dashboard
+            </Link>
           </div>
           <div className="flex items-center gap-4">
             <span className="text-xs text-gray-400">
