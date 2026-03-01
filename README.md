@@ -78,7 +78,7 @@ Open [http://localhost:3000](http://localhost:3000). Sign in with Google to veri
 
 In Google Cloud Console -> APIs & Services -> Credentials -> your OAuth 2.0 Client:
 - Add `http://localhost:3000/api/auth/callback/google` for local development
-- Add `https://sentinel.davidkwartler.com/api/auth/callback/google` for production
+- Add `https://<your-production-domain>/api/auth/callback/google` for production
 
 ## Hijack Simulation Walkthrough
 
@@ -102,7 +102,7 @@ This walkthrough reproduces a session cookie theft and detection end-to-end.
 4. Create a new cookie:
    - Name: `auth_session`
    - Value: *(paste the value copied from Step 1)*
-   - Domain: `localhost` (or `sentinel.davidkwartler.com` for production)
+   - Domain: `localhost` (or your production domain)
    - Path: `/`
 5. Navigate to `/products` in Browser B — **without signing in**
 
