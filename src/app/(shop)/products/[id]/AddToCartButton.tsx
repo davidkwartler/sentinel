@@ -1,8 +1,30 @@
 "use client"
 
+import Link from "next/link"
 import { useCart } from "@/components/CartProvider"
 
 export function AddToCartButton({
+  product,
+  isAuthenticated,
+}: {
+  product: { id: number; name: string; price: number; image: string }
+  isAuthenticated: boolean
+}) {
+  if (!isAuthenticated) {
+    return (
+      <Link
+        href="/login"
+        className="mt-6 inline-block rounded-md bg-gray-900 px-6 py-2 text-sm font-medium text-white transition-colors hover:bg-gray-800"
+      >
+        Sign in to add to cart
+      </Link>
+    )
+  }
+
+  return <AuthenticatedCartButton product={product} />
+}
+
+function AuthenticatedCartButton({
   product,
 }: {
   product: { id: number; name: string; price: number; image: string }

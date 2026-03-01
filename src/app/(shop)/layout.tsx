@@ -1,6 +1,5 @@
 import Link from "next/link"
 import { auth, signOut } from "@/lib/auth"
-import { redirect } from "next/navigation"
 import { FingerprintReporter } from "@/components/FingerprintReporter"
 
 export default async function ShopLayout({
@@ -9,10 +8,6 @@ export default async function ShopLayout({
   children: React.ReactNode
 }) {
   const session = await auth()
-
-  if (!session) {
-    redirect("/login")
-  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -32,48 +27,61 @@ export default async function ShopLayout({
             >
               Products
             </Link>
-            <Link
-              href="/dashboard"
-              className="text-sm text-gray-600 hover:text-gray-900"
-            >
-              Dashboard
-            </Link>
+            {session && (
+              <Link
+                href="/dashboard"
+                className="text-sm text-gray-600 hover:text-gray-900"
+              >
+                Dashboard
+              </Link>
+            )}
           </div>
           <div className="flex items-center gap-3 sm:gap-4">
-            <Link href="/profile" className="flex items-center gap-2">
-              {session.user?.image ? (
-                <img
-                  src={session.user.image}
-                  alt=""
-                  className="h-7 w-7 rounded-full"
-                />
-              ) : (
-                <div className="flex h-7 w-7 items-center justify-center rounded-full bg-gray-100 text-xs text-gray-400">
-                  {session.user?.name?.[0] ?? "?"}
-                </div>
-              )}
-              <span className="hidden text-sm text-gray-600 hover:text-gray-900 sm:inline">
-                Account
-              </span>
-            </Link>
-            <form
-              action={async () => {
-                "use server"
-                await signOut({ redirectTo: "/login" })
-              }}
-            >
-              <button
-                type="submit"
-                className="text-sm text-gray-500 hover:text-gray-700"
+            {session ? (
+              <>
+                <Link href="/profile" className="flex items-center gap-2">
+                  {session.user?.image ? (
+                    <img
+                      src={session.user.image}
+                      alt=""
+                      className="h-7 w-7 rounded-full"
+                    />
+                  ) : (
+                    <div className="flex h-7 w-7 items-center justify-center rounded-full bg-gray-100 text-xs text-gray-400">
+                      {session.user?.name?.[0] ?? "?"}
+                    </div>
+                  )}
+                  <span className="hidden text-sm text-gray-600 hover:text-gray-900 sm:inline">
+                    Account
+                  </span>
+                </Link>
+                <form
+                  action={async () => {
+                    "use server"
+                    await signOut({ redirectTo: "/login" })
+                  }}
+                >
+                  <button
+                    type="submit"
+                    className="text-sm text-gray-500 hover:text-gray-700"
+                  >
+                    Sign out
+                  </button>
+                </form>
+              </>
+            ) : (
+              <Link
+                href="/login"
+                className="rounded-md bg-gray-900 px-4 py-1.5 text-sm font-medium text-white transition-colors hover:bg-gray-800"
               >
-                Sign out
-              </button>
-            </form>
+                Sign in
+              </Link>
+            )}
           </div>
         </div>
       </nav>
       <main className="mx-auto max-w-5xl px-6 py-8">{children}</main>
-      <FingerprintReporter />
+      {session && <FingerprintReporter />}
     </div>
   )
 }

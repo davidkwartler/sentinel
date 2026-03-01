@@ -1,9 +1,21 @@
 import Link from "next/link"
+import { auth, signIn } from "@/lib/auth"
 import { products } from "./data"
+import { LoginModal } from "@/components/LoginModal"
 
-export default function ProductsPage() {
+export default async function ProductsPage() {
+  const session = await auth()
+
   return (
     <div>
+      {!session && (
+        <LoginModal
+          signInAction={async () => {
+            "use server"
+            await signIn("google", { redirectTo: "/" })
+          }}
+        />
+      )}
       <h1 className="mb-1 text-2xl font-semibold text-gray-900">Products</h1>
       <p className="mb-6 text-sm text-gray-500">
         Browse our collection of products.
