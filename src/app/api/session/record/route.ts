@@ -15,6 +15,8 @@ const fingerprintSchema = z.object({
   modelOverride: z.string().optional(),
 })
 
+export const maxDuration = 60
+
 export async function POST(request: NextRequest) {
   const session = await auth()
   if (!session?.user) {
