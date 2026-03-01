@@ -5,7 +5,7 @@ export default function LoginPage() {
     <main className="flex min-h-screen items-center justify-center bg-gray-50">
       <div className="w-full max-w-sm rounded-xl border border-gray-200 bg-white p-8 shadow-sm">
         <h1 className="mb-2 text-center text-2xl font-semibold text-gray-900">
-          Sentinel
+          🛡️ Sentinel
         </h1>
         <p className="mb-8 text-center text-sm text-gray-500">
           Session hijack detection dashboard
@@ -41,6 +41,23 @@ export default function LoginPage() {
             Sign in with Google
           </button>
         </form>
+        <div className="mt-8 space-y-3 border-t border-gray-100 pt-6">
+          <p className="text-xs font-medium text-gray-700">How it works</p>
+          <ul className="space-y-2 text-xs text-gray-500">
+            <li className="flex gap-2">
+              <span className="shrink-0">1.</span>
+              Sign in and browse — your browser fingerprint is recorded
+            </li>
+            <li className="flex gap-2">
+              <span className="shrink-0">2.</span>
+              If your session cookie is used from a different device, we detect it
+            </li>
+            <li className="flex gap-2">
+              <span className="shrink-0">3.</span>
+              Claude analyzes the fingerprints and flags suspicious access
+            </li>
+          </ul>
+        </div>
       </div>
     </main>
   )
