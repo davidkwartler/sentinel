@@ -82,6 +82,8 @@ model DetectionEvent {
   newIp             String?
   similarityScore   Float
   status            String   @default("PENDING")
+  confidenceScore   Float?
+  reasoning         String?  @db.Text
   session           Session  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
 
   @@index([sessionId])

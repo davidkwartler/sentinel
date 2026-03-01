@@ -1,8 +1,9 @@
-import { NextRequest, NextResponse } from "next/server"
+import { NextRequest, NextResponse, after } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/db"
 import { z } from "zod"
 import { runDetection } from "@/lib/detection"
+import { analyzeDetectionEvent } from "@/lib/claude"
 
 const fingerprintSchema = z.object({
   visitorId: z.string().min(1),
@@ -81,6 +82,17 @@ export async function POST(request: NextRequest) {
     screenRes: data.screenRes ?? null,
     timezone: data.timezone ?? null,
   })
+
+  if (detectionResult.detected && detectionResult.eventId) {
+    const eventId = detectionResult.eventId
+    after(async () => {
+      try {
+        await analyzeDetectionEvent(eventId)
+      } catch (err) {
+        console.error("[claude] analyzeDetectionEvent failed for event", eventId, err)
+      }
+    })
+  }
 
   return NextResponse.json({
     status: "ok",
