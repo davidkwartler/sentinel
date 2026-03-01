@@ -37,8 +37,6 @@ export async function analyzeDetectionEvent(eventId: string, modelOverride?: str
           properties: {
             confidenceScore: {
               type: "integer",
-              minimum: 0,
-              maximum: 100,
               description: "0 = definitely not a hijack, 100 = definitely a hijack",
             },
             reasoning: {
