@@ -152,9 +152,14 @@ export function SessionTable({ sessions }: { sessions: SessionRow[] }) {
                             : "border-amber-200 bg-amber-50"
                         }`}
                       >
-                        <p className="mb-2 font-medium text-gray-700">
-                          {isOrig ? "Original" : "New Access"}
-                        </p>
+                        <div className="mb-2 flex items-baseline justify-between gap-2">
+                          <p className="font-medium text-gray-700">
+                            {isOrig ? "Original" : "New Access"}
+                          </p>
+                          <p className="text-[10px] text-gray-400">
+                            {new Date(f.createdAt).toLocaleString()}
+                          </p>
+                        </div>
                         <div className="space-y-1">
                           <FpField
                             label="Visitor ID"
