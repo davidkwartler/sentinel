@@ -50,14 +50,24 @@ export async function analyzeDetectionEvent(eventId: string, modelOverride?: str
     max_tokens: 512,
     system:
       "You are a security analysis system that detects session hijacking. " +
-      "You are given the original browser fingerprint that established a session and a new fingerprint " +
-      "that just accessed the same session. Compare the raw device characteristics to determine " +
-      "whether this is a legitimate user (e.g. same device in incognito mode, browser update, VPN change) " +
-      "or a genuine session hijack (e.g. stolen cookie replayed from a different device/location). " +
-      "Be aware that incognito/private browsing on the same device will produce a different visitor ID " +
-      "but will share the same OS, browser, screen resolution, timezone, and often IP address. " +
-      "Focus on meaningful differences like OS, browser, timezone, and geographic IP changes rather than " +
-      "visitor ID alone.",
+      "You are given two browser fingerprints recorded against the SAME session cookie. " +
+      "The original fingerprint was captured when the user first authenticated. " +
+      "The new fingerprint was captured from a subsequent request using that same session cookie.\n\n" +
+      "KEY CONCEPT: A legitimate user who logs in on multiple devices gets a separate session cookie " +
+      "per device. A single session cookie appearing on two different physical devices means the cookie " +
+      "was stolen and replayed — that is a session hijack. Do NOT flag 'using multiple devices' as " +
+      "suspicious on its own; what matters is that ONE cookie is being used from different devices.\n\n" +
+      "FALSE POSITIVES TO WATCH FOR:\n" +
+      "- Incognito/private browsing on the same device: produces a different visitor ID but shares " +
+      "the same OS, browser, screen resolution, timezone, and usually the same IP.\n" +
+      "- Browser updates or extension changes: may shift the visitor ID but device characteristics stay the same.\n" +
+      "- VPN or DHCP changes: IP changes but all device characteristics remain identical.\n\n" +
+      "STRONG HIJACK INDICATORS:\n" +
+      "- Different OS (e.g. Mac OS X → Windows, or Mac OS X → Android)\n" +
+      "- Different browser family (e.g. Chrome → Firefox)\n" +
+      "- Dramatically different screen resolution indicating a different device class\n" +
+      "- Different timezone combined with different IP suggesting geographically distant access\n\n" +
+      "Focus on device characteristics, not visitor ID alone.",
     messages: [
       {
         role: "user",
