@@ -18,13 +18,13 @@ const MODEL_PICKER_ENABLED =
   process.env.NEXT_PUBLIC_MODEL_PICKER_ENABLED === "true"
 
 export function ProfileSettings() {
-  const [fpMode, setFpMode] = useState<FpMode>("pro")
+  const [fpMode, setFpMode] = useState<FpMode>("oss")
   const [model, setModel] = useState("claude-sonnet-4-6")
   const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
     setFpMode(
-      (localStorage.getItem(FP_MODE_KEY) as FpMode) || "pro",
+      (localStorage.getItem(FP_MODE_KEY) as FpMode) || "oss",
     )
     setModel(
       localStorage.getItem(MODEL_KEY) || "claude-sonnet-4-6",
