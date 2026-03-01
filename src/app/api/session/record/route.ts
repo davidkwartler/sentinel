@@ -98,6 +98,13 @@ export async function POST(request: NextRequest) {
         )
       } catch (err) {
         console.error("[claude] analyzeDetectionEvent failed for event", eventId, err)
+        await prisma.detectionEvent.update({
+          where: { id: eventId },
+          data: {
+            status: "FLAGGED",
+            reasoning: "AI analysis unavailable — flagged automatically due to fingerprint mismatch.",
+          },
+        })
       }
     })
   }
