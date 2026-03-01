@@ -31,7 +31,7 @@ export function FingerprintReporter() {
     const ttl = Number(process.env.NEXT_PUBLIC_FINGERPRINT_TTL_MS ?? 1_800_000)
     if (cached && Date.now() - Number(cached) < ttl) return
 
-    const fpMode = localStorage.getItem("sentinel_fp_mode") || "pro"
+    const fpMode = localStorage.getItem("sentinel_fp_mode") || "oss"
     const modelOverride =
       localStorage.getItem("sentinel_claude_model") || undefined
 
