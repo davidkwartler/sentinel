@@ -9,6 +9,11 @@ different device. When a fingerprint mismatch is detected, Claude analyzes the e
 assigns a confidence score. Flagged sessions appear on the security dashboard with Claude's
 full reasoning.
 
+<img width="1000" height="454" alt="Session hijack detected" src="https://github.com/user-attachments/assets/43a3a6eb-4661-4ec7-8f5d-be39b6086388" />
+<img width="1000" height="411" alt="Session hijack false positive" src="https://github.com/user-attachments/assets/a00a124c-d524-4b48-99db-23a29f415861" />
+
+
+
 ## Architecture
 
 ```
