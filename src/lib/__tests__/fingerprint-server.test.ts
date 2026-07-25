@@ -1,15 +1,33 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
-const { mockGetEvent } = vi.hoisted(() => ({ mockGetEvent: vi.fn() }))
+// Both must be hoisted: vi.mock's factory runs before top-level declarations.
+const { mockGetEvent, MockRequestError } = vi.hoisted(() => ({
+  mockGetEvent: vi.fn(),
+  MockRequestError: class extends Error {
+    statusCode: number
+    errorCode: string
+    constructor(statusCode: number, errorCode: string) {
+      super(`${statusCode} ${errorCode}`)
+      this.statusCode = statusCode
+      this.errorCode = errorCode
+    }
+  },
+}))
 
 vi.mock('@fingerprintjs/fingerprintjs-pro-server-api', () => ({
   FingerprintJsServerApiClient: class {
     getEvent = mockGetEvent
   },
   Region: { Global: 'Global', EU: 'EU', AP: 'AP' },
+  RequestError: MockRequestError,
 }))
 
-import { verifyFingerprint, formatSignals } from '../fingerprint-server'
+import {
+  verifyFingerprint,
+  formatSignals,
+  checkServerApiHealth,
+  describeErrorCode,
+} from '../fingerprint-server'
 
 function eventFixture(overrides: Record<string, unknown> = {}) {
   return {
@@ -123,6 +141,71 @@ describe('verifyFingerprint', () => {
     const result = await verifyFingerprint('req-1', { visitorId: 'client' })
 
     expect(result).toBeNull()
+  })
+})
+
+describe('checkServerApiHealth', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    process.env.FINGERPRINT_SERVER_API_KEY = 'secret'
+  })
+
+  afterEach(() => {
+    delete process.env.FINGERPRINT_SERVER_API_KEY
+    delete process.env.FINGERPRINT_REGION
+  })
+
+  it('reports not_configured when the key is absent', async () => {
+    delete process.env.FINGERPRINT_SERVER_API_KEY
+
+    const health = await checkServerApiHealth()
+
+    expect(health.status).toBe('not_configured')
+    expect(mockGetEvent).not.toHaveBeenCalled()
+  })
+
+  it('treats RequestNotFound as a healthy, authenticated key', async () => {
+    mockGetEvent.mockRejectedValue(new MockRequestError(404, 'RequestNotFound'))
+
+    const health = await checkServerApiHealth()
+
+    expect(health.status).toBe('ok')
+    expect(health.errorCode).toBe('RequestNotFound')
+  })
+
+  it('reports a rejected key', async () => {
+    mockGetEvent.mockRejectedValue(new MockRequestError(403, 'TokenNotFound'))
+
+    const health = await checkServerApiHealth()
+
+    expect(health.status).toBe('error')
+    expect(health.detail).toContain('Secret (Server API) key')
+  })
+
+  it('names a region mismatch and echoes the configured region', async () => {
+    process.env.FINGERPRINT_REGION = 'Global'
+    mockGetEvent.mockRejectedValue(new MockRequestError(403, 'WrongRegion'))
+
+    const health = await checkServerApiHealth()
+
+    expect(health.status).toBe('error')
+    expect(health.errorCode).toBe('WrongRegion')
+    expect(health.detail).toContain('Global')
+  })
+
+  it('never leaks the key in its result', async () => {
+    process.env.FINGERPRINT_SERVER_API_KEY = 'super-secret-value'
+    mockGetEvent.mockRejectedValue(new MockRequestError(403, 'TokenNotFound'))
+
+    const health = await checkServerApiHealth()
+
+    expect(JSON.stringify(health)).not.toContain('super-secret-value')
+  })
+})
+
+describe('describeErrorCode', () => {
+  it('falls back gracefully on unknown codes', () => {
+    expect(describeErrorCode('SomethingNew')).toContain('Unrecognized')
   })
 })
 

@@ -1,6 +1,7 @@
 import {
   FingerprintJsServerApiClient,
   Region,
+  RequestError,
 } from "@fingerprintjs/fingerprintjs-pro-server-api"
 
 // Server-side verification of a client-reported fingerprint.
@@ -42,6 +43,78 @@ export function isServerVerificationEnabled(): boolean {
   return Boolean(process.env.FINGERPRINT_SERVER_API_KEY)
 }
 
+/** Plain-English meaning of Fingerprint's API error codes. */
+export function describeErrorCode(code: string): string {
+  switch (code) {
+    case "TokenRequired":
+      return "No API key was sent — FINGERPRINT_SERVER_API_KEY is missing from this environment."
+    case "TokenNotFound":
+      return "The API key was rejected. Check it is the Secret (Server API) key, not the Public key."
+    case "WrongRegion":
+      return `The key is valid but belongs to a different region. Set FINGERPRINT_REGION (currently ${process.env.FINGERPRINT_REGION ?? "Global"}) to EU or AP to match your workspace.`
+    case "SubscriptionNotActive":
+      return "The Fingerprint subscription is not active."
+    case "FeatureNotEnabled":
+      return "This endpoint is not included in the current Fingerprint plan."
+    case "WorkspaceScopedSecretKeyRequired":
+      return "A workspace-scoped secret key is required for this request."
+    case "RequestNotFound":
+      return "Key authenticated successfully; the request ID simply does not exist."
+    default:
+      return "Unrecognized error code — see Fingerprint's Server API docs."
+  }
+}
+
+export type HealthStatus = "ok" | "not_configured" | "error"
+
+export interface HealthResult {
+  status: HealthStatus
+  region: string
+  errorCode?: string
+  detail: string
+}
+
+/**
+ * Probe the Server API with a request ID that cannot exist. A RequestNotFound
+ * error means credentials and region are correct — anything else names the
+ * actual misconfiguration. Never returns or logs the key itself.
+ */
+export async function checkServerApiHealth(): Promise<HealthResult> {
+  const apiKey = process.env.FINGERPRINT_SERVER_API_KEY
+  const region = process.env.FINGERPRINT_REGION ?? "Global"
+
+  if (!apiKey) {
+    return {
+      status: "not_configured",
+      region,
+      detail:
+        "FINGERPRINT_SERVER_API_KEY is not set in this environment. Fingerprints are client-reported and unverified.",
+    }
+  }
+
+  try {
+    await getClient(apiKey).getEvent("sentinel-health-check-nonexistent")
+    // A hit on a nonexistent ID would be surprising, but it still proves auth.
+    return { status: "ok", region, detail: "Server API reachable and authenticated." }
+  } catch (err) {
+    if (err instanceof RequestError) {
+      const authenticated =
+        err.errorCode === "RequestNotFound" || err.errorCode === "VisitorNotFound"
+      return {
+        status: authenticated ? "ok" : "error",
+        region,
+        errorCode: err.errorCode,
+        detail: describeErrorCode(err.errorCode),
+      }
+    }
+    return {
+      status: "error",
+      region,
+      detail: `Could not reach the Server API: ${err instanceof Error ? err.message : String(err)}`,
+    }
+  }
+}
+
 // The client is cheap to construct but holds connection state; memoize it.
 let client: FingerprintJsServerApiClient | null = null
 
@@ -80,7 +153,15 @@ export async function verifyFingerprint(
   } catch (err) {
     // Fail open on transport/lookup errors: detection still runs on the
     // client-reported fingerprint, which is the pre-verification behaviour.
-    console.warn("[fingerprint] server verification failed for", requestId, err)
+    // Log the API's own error code — it distinguishes a bad key from a wrong
+    // region from a plan that doesn't include the endpoint.
+    console.warn(
+      "[fingerprint] server verification failed for",
+      requestId,
+      err instanceof RequestError
+        ? `${err.statusCode} ${err.errorCode}: ${describeErrorCode(err.errorCode)}`
+        : err,
+    )
     return null
   }
 
