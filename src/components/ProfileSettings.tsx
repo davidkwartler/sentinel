@@ -146,9 +146,13 @@ export function ProfileSettings() {
             Detection events with a confidence score at or above this value are
             flagged.
           </p>
+          {/* Track spans the full 0–100 so the thumb sits where the number
+              actually falls; handleThresholdChange clamps a drag below the
+              floor back up to it. Setting min={MIN_FLAG_THRESHOLD} would park
+              20 at the far left, reading as zero. */}
           <input
             type="range"
-            min={MIN_FLAG_THRESHOLD}
+            min={0}
             max={MAX_FLAG_THRESHOLD}
             step={5}
             value={threshold}
@@ -158,9 +162,8 @@ export function ProfileSettings() {
             className="w-full accent-gray-900"
           />
           <p className="mt-2 text-[11px] italic text-gray-400">
-            Defaults to {DEFAULT_FLAG_THRESHOLD}; adjust higher or lower based
-            on your security posture. Won&apos;t go below {MIN_FLAG_THRESHOLD},
-            where every mismatch would flag regardless of the score.
+            Defaults to {DEFAULT_FLAG_THRESHOLD}, minimum {MIN_FLAG_THRESHOLD}.
+            Adjust based on security posture.
             {model === ANALYSIS_OFF && " Not used while GenAI analysis is off."}
           </p>
         </div>

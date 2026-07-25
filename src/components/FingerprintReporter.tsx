@@ -196,8 +196,16 @@ export function FingerprintReporter() {
 
   if (!visible) return null
 
+  // Pro reads as the emphasized tier (solid brand orange), OSS as the quiet
+  // one (outlined). Same family, two weights — not two unrelated hues.
   const modeBadge = (
-    <span className={`rounded px-1.5 py-0.5 font-medium ${activeMode === "pro" ? "bg-violet-100 text-violet-700" : "bg-gray-100 text-gray-500"}`}>
+    <span
+      className={`rounded px-1.5 py-0.5 font-medium ${
+        activeMode === "pro"
+          ? "bg-[#F35B22] text-white"
+          : "border border-gray-300 bg-white text-gray-600"
+      }`}
+    >
       {activeMode === "pro" ? "Pro" : "OSS"}
     </span>
   )
@@ -207,21 +215,21 @@ export function FingerprintReporter() {
       {status === "capturing" && (
         <>
           <FingerprintIcon className="animate-pulse text-[#F35B22]" />
-          <span className="text-gray-600">Registering fingerprint…</span>
+          <span className="text-gray-900">Registering fingerprint…</span>
           {modeBadge}
         </>
       )}
       {status === "done" && (
         <>
           <FingerprintIcon className="text-[#F35B22]" />
-          <span className="text-gray-600">Fingerprint registered</span>
+          <span className="text-gray-900">Fingerprint registered</span>
           {modeBadge}
         </>
       )}
       {status === "cached" && (
         <>
-          <FingerprintIcon className="text-[#F35B22] opacity-60" />
-          <span className="text-gray-400">Fingerprint on file</span>
+          <FingerprintIcon className="text-[#F35B22]" />
+          <span className="text-gray-900">Fingerprint on file</span>
           {modeBadge}
         </>
       )}
