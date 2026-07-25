@@ -66,7 +66,7 @@ export function AccountMenu({
         aria-haspopup="menu"
         aria-expanded={open}
         aria-label="Account menu"
-        className="flex items-center gap-2 rounded-full border border-gray-300 py-1 pl-1 pr-2.5 transition-colors hover:border-gray-400 hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-900"
+        className="flex items-center gap-2 rounded-full border border-gray-300 py-1 pl-1 pr-2.5 transition-colors hover:border-gray-400 hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-600"
       >
         {avatar}
         <span className="hidden text-sm text-gray-700 sm:inline">Account</span>
