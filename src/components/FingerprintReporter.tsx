@@ -94,6 +94,29 @@ async function captureOss(modelOverride?: string): Promise<FingerprintPayload> {
 
 type FpStatus = "idle" | "capturing" | "done" | "cached"
 
+// Concentric ridges + core, drawn inline so the toast has no icon dependency.
+// Sized in em so it tracks the surrounding text.
+function FingerprintIcon({ className = "" }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.6}
+      strokeLinecap="round"
+      aria-hidden="true"
+      className={`h-4 w-4 shrink-0 ${className}`}
+    >
+      <path d="M4.6 15a7.4 7.4 0 0 1 14.8 0" />
+      <path d="M7.2 15.6a4.8 4.8 0 0 1 9.6 0" />
+      <path d="M9.8 16.2a2.2 2.2 0 0 1 4.4 0" />
+      <path d="M12 18.6v1.2" />
+      <path d="M7.6 18.4l-.5 1.1" />
+      <path d="M16.4 18.4l.5 1.1" />
+    </svg>
+  )
+}
+
 export function FingerprintReporter() {
   const [status, setStatus] = useState<FpStatus>("idle")
   const [visible, setVisible] = useState(false)
@@ -103,6 +126,12 @@ export function FingerprintReporter() {
     // Once a fingerprint is sent, skip re-capturing for the TTL window.
     // ProfileSettings clears this key when the fingerprint mode changes so the
     // next page load re-fingerprints under the new mode.
+    // Resolve the mode before the cache check — the cached branch returns early,
+    // and skipping this left the badge showing the "oss" initial state on every
+    // cached load regardless of the mode actually in use.
+    const fpMode = (localStorage.getItem(FP_MODE_KEY) || (process.env.NEXT_PUBLIC_FINGERPRINT_API_KEY ? "pro" : "oss")) as "pro" | "oss"
+    setActiveMode(fpMode)
+
     const cached = sessionStorage.getItem(FP_CACHE_KEY)
     const ttl = Number(process.env.NEXT_PUBLIC_FINGERPRINT_TTL_MS ?? 1_800_000)
     if (cached && Date.now() - Number(cached) < ttl) {
@@ -112,8 +141,6 @@ export function FingerprintReporter() {
       return () => clearTimeout(timer)
     }
 
-    const fpMode = (localStorage.getItem(FP_MODE_KEY) || (process.env.NEXT_PUBLIC_FINGERPRINT_API_KEY ? "pro" : "oss")) as "pro" | "oss"
-    setActiveMode(fpMode)
     const modelOverride = localStorage.getItem(MODEL_KEY) || undefined
     const storedThreshold = Number(localStorage.getItem(THRESHOLD_KEY))
     const thresholdOverride =
@@ -178,21 +205,21 @@ export function FingerprintReporter() {
     <div className="fixed bottom-4 right-4 z-50 flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-xs shadow-md transition-opacity">
       {status === "capturing" && (
         <>
-          <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-gray-300 border-t-gray-600" />
+          <FingerprintIcon className="animate-pulse text-gray-500" />
           <span className="text-gray-600">Registering fingerprint…</span>
           {modeBadge}
         </>
       )}
       {status === "done" && (
         <>
-          <span className="text-green-600">✓</span>
+          <FingerprintIcon className="text-green-600" />
           <span className="text-gray-600">Fingerprint registered</span>
           {modeBadge}
         </>
       )}
       {status === "cached" && (
         <>
-          <span className="text-green-600">✓</span>
+          <FingerprintIcon className="text-gray-400" />
           <span className="text-gray-400">Fingerprint on file</span>
           {modeBadge}
         </>
