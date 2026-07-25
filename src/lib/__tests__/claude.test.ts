@@ -200,10 +200,10 @@ describe('analyzeDetectionEvent', () => {
     })
     prismaMock.detectionEvent.update.mockResolvedValue({} as any)
 
-    await analyzeDetectionEvent('event-3', 'claude-opus-4-6')
+    await analyzeDetectionEvent('event-3', 'claude-opus-5')
 
     expect(mockCreate).toHaveBeenCalledWith(
-      expect.objectContaining({ model: 'claude-opus-4-6' }),
+      expect.objectContaining({ model: 'claude-opus-5' }),
     )
   })
 

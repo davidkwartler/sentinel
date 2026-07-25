@@ -10,8 +10,8 @@ type FpMode = "pro" | "oss"
 
 const MODEL_OPTIONS = [
   { value: "claude-haiku-4-5", label: "Haiku 4.5" },
-  { value: "claude-sonnet-4-6", label: "Sonnet 4.6" },
-  { value: "claude-opus-4-6", label: "Opus 4.6" },
+  { value: "claude-sonnet-5", label: "Sonnet 5" },
+  { value: "claude-opus-5", label: "Opus 5" },
 ] as const
 
 const MODEL_PICKER_ENABLED =
@@ -24,7 +24,9 @@ export function ProfileSettings() {
 
   useEffect(() => {
     setFpMode(
-      (localStorage.getItem(FP_MODE_KEY) as FpMode) || "oss",
+      // Same default logic as FingerprintReporter: Pro when an API key is configured
+      (localStorage.getItem(FP_MODE_KEY) as FpMode) ||
+        (process.env.NEXT_PUBLIC_FINGERPRINT_API_KEY ? "pro" : "oss"),
     )
     setModel(
       MODEL_PICKER_ENABLED
@@ -76,8 +78,8 @@ export function ProfileSettings() {
           ))}
         </div>
         <p className="mt-2 text-[11px] italic text-gray-400">
-          FingerprintJS open source by default, use Pro with an API key for
-          improved accuracy.
+          Defaults to FingerprintJS Pro when an API key is configured for
+          improved accuracy; falls back to open source otherwise.
         </p>
       </div>
 
