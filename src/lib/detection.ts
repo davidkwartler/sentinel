@@ -1,4 +1,4 @@
-import { prisma } from "@/lib/db"
+import type { Prisma } from "@/generated/prisma/client"
 
 interface FingerprintComponents {
   os?: string | null
@@ -47,42 +47,45 @@ export interface DetectionResult {
 
 /**
  * Check whether the incoming fingerprint represents a session hijack.
- * Runs inside a Prisma $transaction for atomicity.
- * MUST be called AFTER the new fingerprint is already persisted (so isOriginal=true row exists).
+ * Joins the caller's transaction (pass the tx client) so the fingerprint insert
+ * and the detection decision commit or roll back together.
+ * MUST be called AFTER the new fingerprint is persisted in the same tx (so the
+ * isOriginal=true row is visible).
  * Returns { detected: false } if no original exists or visitorIds match.
  * Returns { detected: true, eventId } and writes a DetectionEvent on mismatch.
  */
-export async function runDetection(params: DetectionInput): Promise<DetectionResult> {
+export async function runDetection(
+  tx: Prisma.TransactionClient,
+  params: DetectionInput
+): Promise<DetectionResult> {
   const { sessionId, newVisitorId, newIp } = params
 
-  return await prisma.$transaction(async (tx) => {
-    const original = await tx.fingerprint.findFirst({
-      where: { sessionId, isOriginal: true },
-    })
-
-    if (!original) return { detected: false }
-
-    if (original.visitorId === newVisitorId) return { detected: false }
-
-    const score = computeSimilarity(original, {
-      os: params.os ?? null,
-      browser: params.browser ?? null,
-      screenRes: params.screenRes ?? null,
-      timezone: params.timezone ?? null,
-    })
-
-    const event = await tx.detectionEvent.create({
-      data: {
-        sessionId,
-        originalVisitorId: original.visitorId,
-        newVisitorId,
-        originalIp: original.ip,
-        newIp,
-        similarityScore: score,
-        status: "PENDING",
-      },
-    })
-
-    return { detected: true, eventId: event.id }
+  const original = await tx.fingerprint.findFirst({
+    where: { sessionId, isOriginal: true },
   })
+
+  if (!original) return { detected: false }
+
+  if (original.visitorId === newVisitorId) return { detected: false }
+
+  const score = computeSimilarity(original, {
+    os: params.os ?? null,
+    browser: params.browser ?? null,
+    screenRes: params.screenRes ?? null,
+    timezone: params.timezone ?? null,
+  })
+
+  const event = await tx.detectionEvent.create({
+    data: {
+      sessionId,
+      originalVisitorId: original.visitorId,
+      newVisitorId,
+      originalIp: original.ip,
+      newIp,
+      similarityScore: score,
+      status: "PENDING",
+    },
+  })
+
+  return { detected: true, eventId: event.id }
 }
