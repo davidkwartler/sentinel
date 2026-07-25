@@ -1,7 +1,8 @@
 import Link from "next/link"
 import type { Session } from "next-auth"
 import { AccountMenu } from "@/components/AccountMenu"
-import { ProductsIcon, ShieldIcon, SignInIcon } from "@/components/icons"
+import { ShieldIcon, SignInIcon } from "@/components/icons"
+import { CatalogLink } from "@/components/CatalogLink"
 
 // Shared across the shop layout and the login page so the brand and catalog
 // link stay put while signing in. `showAuth` hides the account controls — on
@@ -30,17 +31,9 @@ export function SiteHeader({
             <span>Sentinel</span>
           </Link>
           {/* Styled as a button rather than a bare link so it reads as an
-              action next to the wordmark instead of part of it. */}
-          <Link
-            href="/products"
-            className="flex items-center gap-1.5 rounded-full border border-gray-300 px-3 py-1.5 text-sm text-gray-700 transition-colors hover:border-gray-400 hover:bg-gray-50 hover:text-gray-900"
-          >
-            <ProductsIcon className="h-4 w-4 text-gray-500" />
-            {/* "Products" on phones so the wordmark keeps its room; the full
-                label from sm up. */}
-            <span className="sm:hidden">Products</span>
-            <span className="hidden sm:inline">Product catalog</span>
-          </Link>
+              action next to the wordmark instead of part of it. Client
+              component: it needs the pathname to mark itself current. */}
+          <CatalogLink />
         </div>
 
         {showAuth && (
