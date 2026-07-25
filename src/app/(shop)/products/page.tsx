@@ -35,7 +35,7 @@ export default async function ProductsPage() {
               {product.image}
             </div>
             <div className="min-w-0 flex-1">
-              <p className="text-xs text-gray-400">{product.category}</p>
+              <p className="text-xs text-gray-500">{product.category}</p>
               <p className="truncate text-sm font-medium text-gray-900 sm:whitespace-normal">
                 {product.name}
               </p>

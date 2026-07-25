@@ -52,7 +52,7 @@ export function CartDrawer() {
           <button
             onClick={() => setOpen(false)}
             aria-label="Close cart"
-            className="text-gray-400 hover:text-gray-600"
+            className="text-gray-500 hover:text-gray-600"
           >
             ✕
           </button>
@@ -60,7 +60,7 @@ export function CartDrawer() {
 
         <div className="flex-1 overflow-y-auto px-5 py-4">
           {items.length === 0 ? (
-            <p className="text-center text-sm text-gray-400 mt-8">
+            <p className="text-center text-sm text-gray-500 mt-8">
               Your cart is empty.
             </p>
           ) : (
@@ -101,7 +101,7 @@ export function CartDrawer() {
                   <button
                     onClick={() => removeItem(item.id)}
                     aria-label="Remove item"
-                    className="text-xs text-gray-400 hover:text-red-500"
+                    className="text-xs text-gray-500 hover:text-red-500"
                   >
                     ✕
                   </button>
@@ -119,7 +119,7 @@ export function CartDrawer() {
                 ${totalPrice.toFixed(2)}
               </span>
             </div>
-            <p className="text-center text-xs text-gray-400">
+            <p className="text-center text-xs text-gray-500">
               Checkout is not available — this is a demo.
             </p>
             <button

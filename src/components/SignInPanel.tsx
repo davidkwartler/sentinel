@@ -34,6 +34,13 @@ export function GoogleSignInButton({ action }: { action: () => void }) {
 // multi-device mismatch, the flag. The steps stay numbered — the icons say
 // what happens, the numbers say in what order, and dropping them left three
 // unrelated glyphs with no sequence.
+//
+// Layout: number and icon sit in their own columns rather than stacked, which
+// is what let the old badge clip the glyph. The number gets the circle's exact
+// height and centres inside it, so alignment survives a font or size change;
+// padding nudges did not. The rail spans circle-bottom to the next circle,
+// crossing the row gap, so it can't fall short when a step wraps to a
+// different number of lines.
 const STEPS = [
   {
     Icon: FingerprintIcon,
@@ -55,19 +62,26 @@ export function HowItWorks() {
       <p className="mb-4 text-center text-xs font-medium text-gray-700">
         How it works
       </p>
-      <div className="space-y-3">
+      <ol className="space-y-3">
         {STEPS.map(({ Icon, text }, i) => (
-          <div key={i} className="flex items-start gap-3">
-            <span className="relative flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gray-100 text-gray-500">
-              <Icon className="h-4 w-4" />
-              <span className="absolute -right-0.5 -top-0.5 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-gray-900 text-[9px] font-medium text-white">
-                {i + 1}
-              </span>
+          <li key={i} className="flex items-stretch gap-2.5">
+            <span className="flex h-8 w-3 shrink-0 items-center justify-end text-[11px] font-medium tabular-nums text-gray-500">
+              {i + 1}
             </span>
-            <p className="pt-1 text-xs leading-relaxed text-gray-500">{text}</p>
-          </div>
+            {/* Decorative: the glyph and rail restate the text, so a screen
+                reader gets the ordered list and nothing else. */}
+            <span aria-hidden="true" className="relative flex flex-col items-center">
+              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-violet-50 text-violet-600">
+                <Icon className="h-4 w-4" />
+              </span>
+              {i < STEPS.length - 1 && (
+                <span className="absolute top-8 -bottom-3 w-px bg-gray-200" />
+              )}
+            </span>
+            <p className="text-xs leading-relaxed text-gray-600">{text}</p>
+          </li>
         ))}
-      </div>
+      </ol>
     </div>
   )
 }

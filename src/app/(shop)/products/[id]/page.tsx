@@ -38,7 +38,7 @@ export default async function ProductDetailPage({
           </div>
 
           <div className="flex-1">
-            <p className="text-xs text-gray-400">{product.category}</p>
+            <p className="text-xs text-gray-500">{product.category}</p>
             <h1 className="mt-1 text-2xl font-semibold text-gray-900">
               {product.name}
             </h1>
