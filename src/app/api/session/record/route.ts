@@ -4,7 +4,7 @@ import { prisma } from "@/lib/db"
 import { z } from "zod"
 import { runDetection } from "@/lib/detection"
 import { analyzeDetectionEvent } from "@/lib/claude"
-import { ANALYSIS_MODEL_IDS } from "@/lib/settings"
+import { ANALYSIS_MODEL_IDS, ANALYSIS_OFF } from "@/lib/settings"
 
 // Length caps double as prompt-injection hardening: these values are
 // interpolated into the Claude analysis prompt, so keep them short and
@@ -18,6 +18,7 @@ const fingerprintSchema = z.object({
   screenRes: z.string().max(32).optional(),
   timezone: z.string().max(64).optional(),
   modelOverride: z.enum(ANALYSIS_MODEL_IDS).optional(),
+  thresholdOverride: z.number().int().min(0).max(100).optional(),
 })
 
 // Each mismatched fingerprint triggers a Claude call, so an authenticated
@@ -147,10 +148,23 @@ export async function POST(request: NextRequest) {
       try {
         const allowModelOverride =
           process.env.NEXT_PUBLIC_MODEL_PICKER_ENABLED === "true"
-        await analyzeDetectionEvent(
-          eventId,
-          allowModelOverride ? data.modelOverride : undefined,
-        )
+        const modelOverride = allowModelOverride ? data.modelOverride : undefined
+
+        // Analysis "off": skip Claude and flag on fingerprint mismatch alone —
+        // this event only exists because the visitor ID diverged.
+        if (modelOverride === ANALYSIS_OFF) {
+          await prisma.detectionEvent.update({
+            where: { id: eventId },
+            data: {
+              status: "FLAGGED",
+              reasoning:
+                "GenAI analysis disabled — flagged on fingerprint mismatch alone.",
+            },
+          })
+          return
+        }
+
+        await analyzeDetectionEvent(eventId, modelOverride, data.thresholdOverride)
       } catch (err) {
         // Fail closed: a broken analysis pipeline must not let a suspicious
         // session pass silently, so flag it rather than leaving it PENDING.

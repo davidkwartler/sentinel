@@ -3,11 +3,14 @@
 import { useEffect, useState } from "react"
 
 import {
+  ANALYSIS_OFF,
+  DEFAULT_FLAG_THRESHOLD,
   DEFAULT_MODEL,
   FP_CACHE_KEY,
   FP_MODE_KEY,
   MODEL_KEY,
   MODEL_OPTIONS,
+  THRESHOLD_KEY,
 } from "@/lib/settings"
 
 type FpMode = "pro" | "oss"
@@ -17,7 +20,8 @@ const MODEL_PICKER_ENABLED =
 
 export function ProfileSettings() {
   const [fpMode, setFpMode] = useState<FpMode>("oss")
-  const [model, setModel] = useState(DEFAULT_MODEL)
+  const [model, setModel] = useState<string>(DEFAULT_MODEL)
+  const [threshold, setThreshold] = useState(DEFAULT_FLAG_THRESHOLD)
   const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
@@ -31,6 +35,10 @@ export function ProfileSettings() {
         ? localStorage.getItem(MODEL_KEY) || DEFAULT_MODEL
         : DEFAULT_MODEL,
     )
+    const storedThreshold = Number(localStorage.getItem(THRESHOLD_KEY))
+    if (Number.isInteger(storedThreshold) && storedThreshold >= 0 && storedThreshold <= 100 && localStorage.getItem(THRESHOLD_KEY) !== null) {
+      setThreshold(storedThreshold)
+    }
     setMounted(true)
   }, [])
 
@@ -44,6 +52,11 @@ export function ProfileSettings() {
   function handleModelChange(value: string) {
     setModel(value)
     localStorage.setItem(MODEL_KEY, value)
+  }
+
+  function handleThresholdChange(value: number) {
+    setThreshold(value)
+    localStorage.setItem(THRESHOLD_KEY, String(value))
   }
 
   if (!mounted) return null
@@ -110,9 +123,40 @@ export function ProfileSettings() {
           ))}
         </div>
         <p className="mt-2 text-[11px] italic text-gray-400">
-          Claude Haiku by default, use Opus for best results.
+          Claude Haiku by default, use Opus for best results. Off skips GenAI
+          analysis and flags on fingerprint mismatch alone.
           {!MODEL_PICKER_ENABLED && " Model selection is disabled in this environment."}
         </p>
+
+        {/* Flag Threshold */}
+        <div className={`mt-4 border-t border-gray-100 pt-4 ${model === ANALYSIS_OFF ? "opacity-50" : ""}`}>
+          <div className="mb-1 flex items-center justify-between">
+            <p className="text-sm font-medium text-gray-900">Flag Threshold</p>
+            <span className="rounded bg-gray-100 px-2 py-0.5 text-xs font-semibold text-gray-700">
+              {threshold}
+            </span>
+          </div>
+          <p className="mb-3 text-xs text-gray-500">
+            Detection events with a confidence score at or above this value are
+            flagged.
+          </p>
+          <input
+            type="range"
+            min={0}
+            max={100}
+            step={5}
+            value={threshold}
+            disabled={model === ANALYSIS_OFF}
+            onChange={(e) => handleThresholdChange(Number(e.target.value))}
+            aria-label="Flag threshold"
+            className="w-full accent-gray-900"
+          />
+          <p className="mt-2 text-[11px] italic text-gray-400">
+            Defaults to {DEFAULT_FLAG_THRESHOLD}; adjust higher or lower based
+            on your security posture.
+            {model === ANALYSIS_OFF && " Not used while GenAI analysis is off."}
+          </p>
+        </div>
       </div>
     </div>
   )
