@@ -4,7 +4,7 @@ import Link from "next/link"
 import { cookies } from "next/headers"
 import { prisma } from "@/lib/db"
 import { ProfileSettings } from "@/components/ProfileSettings"
-import { isServerVerificationEnabled } from "@/lib/fingerprint-server"
+import { getCachedServerApiHealth } from "@/lib/fingerprint-server"
 
 export default async function AccountPage() {
   const session = await auth()
@@ -14,7 +14,7 @@ export default async function AccountPage() {
   const userId = user!.id!
   const currentToken = (await cookies()).get("auth_session")?.value ?? null
 
-  const [activeSessions, currentSession, flaggedCount] = await Promise.all([
+  const [activeSessions, currentSession, flaggedCount, health] = await Promise.all([
     prisma.session.count({ where: { userId, expires: { gt: new Date() } } }),
     currentToken
       ? prisma.session.findUnique({
@@ -25,12 +25,21 @@ export default async function AccountPage() {
     prisma.detectionEvent.count({
       where: { session: { userId }, status: "FLAGGED" },
     }),
+    getCachedServerApiHealth(),
   ])
 
-  const verificationOn = isServerVerificationEnabled()
+  // "Server-side" means a live probe authenticated, not merely that a key is
+  // present — a wrong key or region would otherwise report healthy while every
+  // lookup silently fell back to client-reported data.
+  const verification =
+    health.status === "ok"
+      ? { value: "Server-side", tone: "default" as const, hint: undefined }
+      : health.status === "not_configured"
+        ? { value: "Client only", tone: "default" as const, hint: undefined }
+        : { value: "Failing", tone: "warn" as const, hint: health.errorCode }
 
   return (
-    <div className="mx-auto max-w-3xl">
+    <div>
       <h1 className="mb-6 text-2xl font-semibold text-gray-900">Account</h1>
 
       {/* Identity. Name and email appear here and nowhere else on the page. */}
@@ -75,7 +84,9 @@ export default async function AccountPage() {
           />
           <Stat
             label="Verification"
-            value={verificationOn ? "Server-side" : "Client only"}
+            value={verification.value}
+            tone={verification.tone}
+            hint={verification.hint}
           />
         </dl>
       </section>
@@ -88,11 +99,32 @@ export default async function AccountPage() {
   )
 }
 
-function Stat({ label, value }: { label: string; value: string }) {
+function Stat({
+  label,
+  value,
+  tone = "default",
+  hint,
+}: {
+  label: string
+  value: string
+  tone?: "default" | "warn"
+  hint?: string
+}) {
   return (
-    <div className="rounded-lg border border-gray-200 bg-white px-4 py-3 shadow-sm">
+    <div
+      className={`rounded-lg border bg-white px-4 py-3 shadow-sm ${
+        tone === "warn" ? "border-amber-300" : "border-gray-200"
+      }`}
+    >
       <dt className="text-xs text-gray-500">{label}</dt>
-      <dd className="mt-1 truncate text-lg font-semibold text-gray-900">{value}</dd>
+      <dd
+        className={`mt-1 truncate text-lg font-semibold ${
+          tone === "warn" ? "text-amber-700" : "text-gray-900"
+        }`}
+        title={hint}
+      >
+        {value}
+      </dd>
     </div>
   )
 }

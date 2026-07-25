@@ -26,6 +26,7 @@ import {
   verifyFingerprint,
   formatSignals,
   checkServerApiHealth,
+  getCachedServerApiHealth,
   describeErrorCode,
 } from '../fingerprint-server'
 import { clampThreshold, MIN_FLAG_THRESHOLD } from '../settings'
@@ -201,6 +202,29 @@ describe('checkServerApiHealth', () => {
     const health = await checkServerApiHealth()
 
     expect(JSON.stringify(health)).not.toContain('super-secret-value')
+  })
+})
+
+describe('getCachedServerApiHealth', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    process.env.FINGERPRINT_SERVER_API_KEY = 'secret'
+  })
+
+  afterEach(() => {
+    delete process.env.FINGERPRINT_SERVER_API_KEY
+  })
+
+  it('probes once and serves the cached result afterwards', async () => {
+    mockGetEvent.mockRejectedValue(new MockRequestError(404, 'RequestNotFound'))
+
+    const first = await getCachedServerApiHealth()
+    const second = await getCachedServerApiHealth()
+
+    expect(first.status).toBe('ok')
+    expect(second).toEqual(first)
+    // Second call served from cache — no additional API round-trip
+    expect(mockGetEvent).toHaveBeenCalledTimes(1)
   })
 })
 
