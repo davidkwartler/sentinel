@@ -28,6 +28,7 @@ import {
   checkServerApiHealth,
   describeErrorCode,
 } from '../fingerprint-server'
+import { clampThreshold, MIN_FLAG_THRESHOLD } from '../settings'
 
 function eventFixture(overrides: Record<string, unknown> = {}) {
   return {
@@ -200,6 +201,16 @@ describe('checkServerApiHealth', () => {
     const health = await checkServerApiHealth()
 
     expect(JSON.stringify(health)).not.toContain('super-secret-value')
+  })
+})
+
+describe('clampThreshold', () => {
+  it('enforces the floor, ceiling, and integer rounding', () => {
+    expect(clampThreshold(0)).toBe(MIN_FLAG_THRESHOLD)
+    expect(clampThreshold(5)).toBe(MIN_FLAG_THRESHOLD)
+    expect(clampThreshold(150)).toBe(100)
+    expect(clampThreshold(70)).toBe(70)
+    expect(clampThreshold(70.6)).toBe(71)
   })
 })
 

@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { DEFAULT_FLAG_THRESHOLD, THRESHOLD_KEY } from "@/lib/settings"
+import { clampThreshold, DEFAULT_FLAG_THRESHOLD, THRESHOLD_KEY } from "@/lib/settings"
 
 type DetectionEventRow = {
   id: string
@@ -67,7 +67,7 @@ export function SessionTable({
   useEffect(() => {
     const stored = Number(localStorage.getItem(THRESHOLD_KEY))
     if (localStorage.getItem(THRESHOLD_KEY) !== null && Number.isFinite(stored)) {
-      setThreshold(stored)
+      setThreshold(clampThreshold(stored))
     }
   }, [])
 
