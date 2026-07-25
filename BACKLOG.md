@@ -2,6 +2,20 @@
 
 ## Next
 
+### Inconsistent page width between sessions and account
+
+The session monitoring page is wider than the account page, so the content
+shifts when moving between them.
+
+Cause: the shop layout wraps `<main>` in `max-w-5xl`, which `/sessions` uses
+as-is, while `/account` adds its own `max-w-3xl` container (added during the
+account redesign to keep the settings rows from stretching).
+
+Decide which width wins. `max-w-3xl` suits the account page's label/control
+rows; the sessions page benefits from the extra width for the side-by-side
+fingerprint comparison. If they should match, the fingerprint comparison grid
+is the thing to check at the narrower width.
+
 ### New README screenshots
 
 The two screenshots at the top of the README predate the July 2026 UI work and
