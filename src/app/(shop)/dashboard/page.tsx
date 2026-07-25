@@ -15,6 +15,7 @@ export default async function DashboardPage() {
       expires: true,
       fingerprints: {
         orderBy: { createdAt: "asc" },
+        take: 25, // dashboard polls; bound the payload per session
         select: {
           visitorId: true,
           ip: true,
@@ -43,7 +44,7 @@ export default async function DashboardPage() {
 
   return (
     <div>
-      <PollingRefresher intervalMs={5000} />
+      <PollingRefresher intervalMs={8000} />
       <div className="mb-6">
         <h1 className="mb-1 text-2xl font-semibold text-gray-900">
           Session Monitoring

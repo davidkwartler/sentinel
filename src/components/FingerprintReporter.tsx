@@ -5,8 +5,7 @@ import {
   FingerprintJSPro,
   type ExtendedGetResult,
 } from "@fingerprintjs/fingerprintjs-pro-spa"
-
-const CACHE_KEY = "sentinel_fp_sent"
+import { FP_CACHE_KEY, FP_MODE_KEY, MODEL_KEY } from "@/lib/settings"
 
 function parseUserAgent(ua: string): { os: string; browser: string } {
   let os = "Unknown"
@@ -25,6 +24,68 @@ function parseUserAgent(ua: string): { os: string; browser: string } {
   return { os, browser }
 }
 
+interface FingerprintPayload {
+  visitorId: string
+  requestId: string
+  os: string
+  browser: string
+  screenRes: string
+  timezone: string
+  modelOverride?: string
+}
+
+// Loading the Pro SDK is network-bound; memoize the client at module level so
+// repeat captures within a tab session don't re-download it.
+let proClientPromise: ReturnType<typeof FingerprintJSPro.load> | null = null
+
+async function capturePro(modelOverride?: string): Promise<FingerprintPayload | null> {
+  const apiKey = process.env.NEXT_PUBLIC_FINGERPRINT_API_KEY
+  if (!apiKey) {
+    console.warn("[Sentinel] NEXT_PUBLIC_FINGERPRINT_API_KEY not set")
+    return null
+  }
+
+  try {
+    proClientPromise ??= FingerprintJSPro.load({ apiKey })
+    const client = await proClientPromise
+    const result = (await client.get({
+      extendedResult: true,
+    })) as ExtendedGetResult
+
+    return {
+      visitorId: result.visitorId,
+      requestId: result.requestId,
+      os: result.os,
+      browser: result.browserName,
+      screenRes: `${screen.width}x${screen.height}`,
+      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      modelOverride,
+    }
+  } catch (err) {
+    console.warn("[Sentinel] Pro fingerprint failed:", err)
+    proClientPromise = null
+    return null
+  }
+}
+
+async function captureOss(modelOverride?: string): Promise<FingerprintPayload> {
+  const FingerprintJS = await import("@fingerprintjs/fingerprintjs")
+  const agent = await FingerprintJS.load()
+  const result = await agent.get()
+
+  const { os, browser } = parseUserAgent(navigator.userAgent)
+
+  return {
+    visitorId: result.visitorId,
+    requestId: crypto.randomUUID(),
+    os,
+    browser,
+    screenRes: `${screen.width}x${screen.height}`,
+    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+    modelOverride,
+  }
+}
+
 type FpStatus = "idle" | "capturing" | "done" | "cached"
 
 export function FingerprintReporter() {
@@ -33,7 +94,10 @@ export function FingerprintReporter() {
   const [activeMode, setActiveMode] = useState<"pro" | "oss">("oss")
 
   useEffect(() => {
-    const cached = sessionStorage.getItem(CACHE_KEY)
+    // Once a fingerprint is sent, skip re-capturing for the TTL window.
+    // ProfileSettings clears this key when the fingerprint mode changes so the
+    // next page load re-fingerprints under the new mode.
+    const cached = sessionStorage.getItem(FP_CACHE_KEY)
     const ttl = Number(process.env.NEXT_PUBLIC_FINGERPRINT_TTL_MS ?? 1_800_000)
     if (cached && Date.now() - Number(cached) < ttl) {
       setStatus("cached")
@@ -42,60 +106,24 @@ export function FingerprintReporter() {
       return () => clearTimeout(timer)
     }
 
-    const fpMode = (localStorage.getItem("sentinel_fp_mode") || (process.env.NEXT_PUBLIC_FINGERPRINT_API_KEY ? "pro" : "oss")) as "pro" | "oss"
+    const fpMode = (localStorage.getItem(FP_MODE_KEY) || (process.env.NEXT_PUBLIC_FINGERPRINT_API_KEY ? "pro" : "oss")) as "pro" | "oss"
     setActiveMode(fpMode)
-    const modelOverride =
-      localStorage.getItem("sentinel_claude_model") || undefined
+    const modelOverride = localStorage.getItem(MODEL_KEY) || undefined
 
     let cancelled = false
 
-    async function capturePro() {
-      const apiKey = process.env.NEXT_PUBLIC_FINGERPRINT_API_KEY
-      if (!apiKey) {
-        console.warn("[Sentinel] NEXT_PUBLIC_FINGERPRINT_API_KEY not set")
-        return null
-      }
-
-      try {
-        const client = await FingerprintJSPro.load({ apiKey })
-        const result = (await client.get({
-          extendedResult: true,
-        })) as ExtendedGetResult
-
-        if (cancelled) return null
-
-        return {
-          visitorId: result.visitorId,
-          requestId: result.requestId,
-          os: result.os,
-          browser: result.browserName,
-          screenRes: `${screen.width}x${screen.height}`,
-          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-          modelOverride,
+    async function submit(payload: FingerprintPayload): Promise<void> {
+      const res = await fetch("/api/session/record", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      })
+      if (res.ok) {
+        sessionStorage.setItem(FP_CACHE_KEY, String(Date.now()))
+        if (!cancelled) {
+          setStatus("done")
+          setTimeout(() => setVisible(false), 3000)
         }
-      } catch (err) {
-        console.warn("[Sentinel] Pro fingerprint failed:", err)
-        return null
-      }
-    }
-
-    async function captureOss() {
-      const FingerprintJS = await import("@fingerprintjs/fingerprintjs")
-      const agent = await FingerprintJS.load()
-      const result = await agent.get()
-
-      if (cancelled) return
-
-      const { os, browser } = parseUserAgent(navigator.userAgent)
-
-      return {
-        visitorId: result.visitorId,
-        requestId: crypto.randomUUID(),
-        os,
-        browser,
-        screenRes: `${screen.width}x${screen.height}`,
-        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-        modelOverride,
       }
     }
 
@@ -104,54 +132,19 @@ export function FingerprintReporter() {
         setStatus("capturing")
         setVisible(true)
 
-        let payload = await (fpMode === "pro" ? capturePro() : captureOss())
-
-        if (!payload && fpMode === "pro") {
-          console.warn("[Sentinel] Pro fingerprint failed, falling back to OSS")
-          payload = await captureOss()
-        }
-
-        if (!payload || cancelled) return
-
-        const res = await fetch("/api/session/record", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        })
-
-        if (res.ok) {
-          sessionStorage.setItem(CACHE_KEY, String(Date.now()))
-          if (!cancelled) {
-            setStatus("done")
-            setTimeout(() => setVisible(false), 3000)
+        let payload = fpMode === "pro" ? await capturePro(modelOverride) : null
+        if (!payload) {
+          if (fpMode === "pro") {
+            console.warn("[Sentinel] Pro fingerprint unavailable, falling back to OSS")
           }
+          payload = await captureOss(modelOverride)
         }
+        if (cancelled) return
+
+        await submit(payload)
       } catch (err) {
-        if (fpMode === "pro" && !cancelled) {
-          console.warn("[Sentinel] Pro fingerprint failed, falling back to OSS:", err)
-          try {
-            const payload = await captureOss()
-            if (!payload || cancelled) return
-            const res = await fetch("/api/session/record", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify(payload),
-            })
-            if (res.ok) {
-              sessionStorage.setItem(CACHE_KEY, String(Date.now()))
-              if (!cancelled) {
-                setStatus("done")
-                setTimeout(() => setVisible(false), 3000)
-              }
-            }
-          } catch (ossErr) {
-            console.error("[Sentinel] OSS fallback also failed:", ossErr)
-            if (!cancelled) setVisible(false)
-          }
-        } else {
-          console.error("[Sentinel] Fingerprint capture failed:", err)
-          if (!cancelled) setVisible(false)
-        }
+        console.error("[Sentinel] Fingerprint capture failed:", err)
+        if (!cancelled) setVisible(false)
       }
     }
 
