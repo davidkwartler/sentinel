@@ -18,7 +18,8 @@ export default async function ProductsPage() {
       )}
       <h1 className="mb-1 text-2xl font-semibold text-gray-900">Products</h1>
       <p className="mb-6 text-sm text-gray-500">
-        Browse our collection of products.
+        Browse the sample product catalog while Sentinel records your device
+        fingerprint.
       </p>
       {/* One column of rows on phones, cards from sm up. Two 155px cards side
           by side left the name and price cramped; a full-width row gives the

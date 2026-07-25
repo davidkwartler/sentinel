@@ -14,7 +14,7 @@ function Stroke({
       viewBox="0 0 20 20"
       fill="none"
       stroke="currentColor"
-      strokeWidth={1.5}
+      strokeWidth={1.75}
       strokeLinecap="round"
       strokeLinejoin="round"
       aria-hidden="true"
@@ -63,13 +63,13 @@ export function ShieldIcon({
   )
 }
 
-export function GridIcon({ className }: { className?: string }) {
+// A price tag rather than the old four-square grid: the grid said "layout",
+// not "things you can buy", and four thin squares turned to mush at 14px.
+export function ProductsIcon({ className }: { className?: string }) {
   return (
     <Stroke className={className}>
-      <rect x="2.75" y="3.25" width="6" height="6" rx="1.25" />
-      <rect x="11.25" y="3.25" width="6" height="6" rx="1.25" />
-      <rect x="2.75" y="10.75" width="6" height="6" rx="1.25" />
-      <rect x="11.25" y="10.75" width="6" height="6" rx="1.25" />
+      <path d="M10.15 3.25H15.5a1.25 1.25 0 0 1 1.25 1.25v5.35a1.5 1.5 0 0 1-.44 1.06l-5.4 5.4a1.5 1.5 0 0 1-2.12 0l-4.5-4.5a1.5 1.5 0 0 1 0-2.12l5.4-5.4a1.5 1.5 0 0 1 1.06-.44z" />
+      <circle cx="13.4" cy="6.6" r="1.1" />
     </Stroke>
   )
 }
@@ -83,12 +83,15 @@ export function UserIcon({ className }: { className?: string }) {
   )
 }
 
-export function MonitorIcon({ className }: { className?: string }) {
+// A key, not the old monitor. A session is a credential, so the key says what
+// the page is about; an empty screen just said "some device".
+export function SessionsIcon({ className }: { className?: string }) {
   return (
     <Stroke className={className}>
-      <rect x="2.75" y="4.25" width="14.5" height="10" rx="1.5" />
-      <path d="M7 16.75h6" />
-      <path d="M10 14.25v2.5" />
+      <circle cx="7.25" cy="7.25" r="3.5" />
+      <path d="M9.75 9.75 16.25 16.25" />
+      <path d="M12.5 12.5 11 14" />
+      <path d="M14.25 14.25 12.75 15.75" />
     </Stroke>
   )
 }
