@@ -73,7 +73,9 @@ export function Footer() {
         </div>
 
         <p className="whitespace-nowrap text-gray-500">
-          &copy; {new Date().getFullYear()} David Kwartler. All rights reserved.
+          {/* No "All rights reserved" — the repo is MIT licensed, and the
+              phrase claims the opposite of what LICENSE grants. */}
+          &copy; {new Date().getFullYear()} David Kwartler
         </p>
       </div>
     </footer>
