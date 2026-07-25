@@ -23,13 +23,16 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
 
-  // Look up the database session by userId (auth() doesn't expose session ID directly)
-  const dbSession = await prisma.session.findFirst({
-    where: { userId: session.user.id! },
-    orderBy: { expires: "desc" },
-  })
+  // Resolve the DB session by the exact cookie presented on THIS request, not by
+  // userId. A user can hold several legitimate sessions (laptop + phone); keying
+  // off the cookie ties each fingerprint to the session it actually rode in on —
+  // which is the whole premise of detecting one cookie on two devices.
+  const sessionToken = request.cookies.get("auth_session")?.value
+  const dbSession = sessionToken
+    ? await prisma.session.findUnique({ where: { sessionToken } })
+    : null
 
-  if (!dbSession) {
+  if (!dbSession || dbSession.userId !== session.user.id) {
     return NextResponse.json({ error: "Session not found" }, { status: 404 })
   }
 
@@ -41,50 +44,76 @@ export async function POST(request: NextRequest) {
 
   const data = parsed.data
 
-  // Deduplication: skip if this requestId already exists
-  const existing = await prisma.fingerprint.findUnique({
-    where: { requestId: data.requestId },
-  })
-  if (existing) {
-    return NextResponse.json({ status: "duplicate", id: existing.id })
-  }
-
-  // Check if this is the first fingerprint for this session (mark as original)
-  const hasExisting = await prisma.fingerprint.findFirst({
-    where: { sessionId: dbSession.id },
-  })
-
   const ip =
     request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
     request.headers.get("x-real-ip") ??
     null
   const userAgent = request.headers.get("user-agent") ?? null
 
-  const fingerprint = await prisma.fingerprint.create({
-    data: {
-      sessionId: dbSession.id,
-      visitorId: data.visitorId,
-      requestId: data.requestId,
-      ip,
-      userAgent,
-      os: data.os ?? null,
-      browser: data.browser ?? null,
-      screenRes: data.screenRes ?? null,
-      timezone: data.timezone ?? null,
-      isOriginal: !hasExisting,
-    },
-  })
+  // Dedupe check, isOriginal decision, insert, and detection all commit atomically.
+  // Serializable isolation prevents two concurrent first-loads (React strict mode,
+  // prefetch) from both reading "no fingerprints yet" and both inserting
+  // isOriginal=true; the loser gets a serialization conflict (P2034) and retries.
+  type RecordOutcome =
+    | { kind: "duplicate"; id: string }
+    | { kind: "created"; id: string; detected: boolean; eventId?: string }
 
-  // Run detection: compare new fingerprint against session's original
-  const detectionResult = await runDetection({
-    sessionId: dbSession.id,
-    newVisitorId: data.visitorId,
-    newIp: ip,
-    os: data.os ?? null,
-    browser: data.browser ?? null,
-    screenRes: data.screenRes ?? null,
-    timezone: data.timezone ?? null,
-  })
+  let outcome: RecordOutcome | undefined
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      outcome = await prisma.$transaction(
+        async (tx): Promise<RecordOutcome> => {
+          const existing = await tx.fingerprint.findUnique({
+            where: { requestId: data.requestId },
+          })
+          if (existing) return { kind: "duplicate", id: existing.id }
+
+          const hasExisting = await tx.fingerprint.findFirst({
+            where: { sessionId: dbSession.id },
+          })
+
+          const fingerprint = await tx.fingerprint.create({
+            data: {
+              sessionId: dbSession.id,
+              visitorId: data.visitorId,
+              requestId: data.requestId,
+              ip,
+              userAgent,
+              os: data.os ?? null,
+              browser: data.browser ?? null,
+              screenRes: data.screenRes ?? null,
+              timezone: data.timezone ?? null,
+              isOriginal: !hasExisting,
+            },
+          })
+
+          const detection = await runDetection(tx, {
+            sessionId: dbSession.id,
+            newVisitorId: data.visitorId,
+            newIp: ip,
+            os: data.os ?? null,
+            browser: data.browser ?? null,
+            screenRes: data.screenRes ?? null,
+            timezone: data.timezone ?? null,
+          })
+
+          return { kind: "created", id: fingerprint.id, ...detection }
+        },
+        { isolationLevel: "Serializable" },
+      )
+      break
+    } catch (err) {
+      const isSerializationConflict =
+        typeof err === "object" && err !== null && "code" in err && err.code === "P2034"
+      if (!isSerializationConflict || attempt === 2) throw err
+    }
+  }
+
+  if (outcome!.kind === "duplicate") {
+    return NextResponse.json({ status: "duplicate", id: outcome!.id })
+  }
+
+  const detectionResult = outcome! as Extract<RecordOutcome, { kind: "created" }>
 
   if (detectionResult.detected && detectionResult.eventId) {
     const eventId = detectionResult.eventId
@@ -111,7 +140,7 @@ export async function POST(request: NextRequest) {
 
   return NextResponse.json({
     status: "ok",
-    id: fingerprint.id,
+    id: detectionResult.id,
     detected: detectionResult.detected,
     eventId: detectionResult.eventId ?? null,
   })

@@ -51,10 +51,9 @@ describe('computeSimilarity', () => {
 
 describe('runDetection', () => {
   it('returns detected:false when no original fingerprint exists', async () => {
-    prismaMock.$transaction.mockImplementation(async (fn: any) => fn(prismaMock))
     prismaMock.fingerprint.findFirst.mockResolvedValue(null)
 
-    const result = await runDetection({
+    const result = await runDetection(prismaMock, {
       sessionId: 'sess-1',
       newVisitorId: 'fp-new',
       newIp: '1.2.3.4',
@@ -63,7 +62,6 @@ describe('runDetection', () => {
   })
 
   it('returns detected:false when visitorId matches original', async () => {
-    prismaMock.$transaction.mockImplementation(async (fn: any) => fn(prismaMock))
     prismaMock.fingerprint.findFirst.mockResolvedValue({
       id: 'fp-1',
       visitorId: 'fp-same',
@@ -79,7 +77,7 @@ describe('runDetection', () => {
       createdAt: new Date(),
     })
 
-    const result = await runDetection({
+    const result = await runDetection(prismaMock, {
       sessionId: 'sess-1',
       newVisitorId: 'fp-same',
       newIp: '1.2.3.4',
@@ -88,7 +86,6 @@ describe('runDetection', () => {
   })
 
   it('returns detected:true and creates DetectionEvent on visitorId mismatch', async () => {
-    prismaMock.$transaction.mockImplementation(async (fn: any) => fn(prismaMock))
     prismaMock.fingerprint.findFirst.mockResolvedValue({
       id: 'fp-1',
       visitorId: 'fp-original',
@@ -117,7 +114,7 @@ describe('runDetection', () => {
       reasoning: null,
     })
 
-    const result = await runDetection({
+    const result = await runDetection(prismaMock, {
       sessionId: 'sess-1',
       newVisitorId: 'fp-new',
       newIp: '9.9.9.9',
