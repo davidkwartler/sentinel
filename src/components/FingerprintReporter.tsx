@@ -94,25 +94,30 @@ async function captureOss(modelOverride?: string): Promise<FingerprintPayload> {
 
 type FpStatus = "idle" | "capturing" | "done" | "cached"
 
-// Concentric ridges + core, drawn inline so the toast has no icon dependency.
-// Sized in em so it tracks the surrounding text.
+// Generic fingerprint glyph: arched ridges trailing downward. Drawn inline so
+// the toast pulls in no icon dependency, and inherits color via currentColor.
+// To use Fingerprint's own mark instead, replace the paths below with their
+// official SVG — nothing else needs to change.
 function FingerprintIcon({ className = "" }: { className?: string }) {
   return (
     <svg
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
-      strokeWidth={1.6}
+      strokeWidth={1.7}
       strokeLinecap="round"
       aria-hidden="true"
       className={`h-4 w-4 shrink-0 ${className}`}
     >
-      <path d="M4.6 15a7.4 7.4 0 0 1 14.8 0" />
-      <path d="M7.2 15.6a4.8 4.8 0 0 1 9.6 0" />
-      <path d="M9.8 16.2a2.2 2.2 0 0 1 4.4 0" />
-      <path d="M12 18.6v1.2" />
-      <path d="M7.6 18.4l-.5 1.1" />
-      <path d="M16.4 18.4l.5 1.1" />
+      <path d="M4.9 12.2a7.1 7.1 0 0 1 14.2 0" />
+      <path d="M4.9 12.2c0 3.1-.4 5.6-1 7.4" />
+      <path d="M19.1 12.2c0 3.1.4 5.6 1 7.4" />
+      <path d="M7.7 12.6a4.3 4.3 0 0 1 8.6 0" />
+      <path d="M7.7 12.6c0 3.3-.4 5.9-.9 7.6" />
+      <path d="M16.3 12.6c0 3.3.4 5.9.9 7.6" />
+      <path d="M10.4 13a1.6 1.6 0 0 1 3.2 0" />
+      <path d="M10.4 13c0 3.6-.2 6.1-.5 7.7" />
+      <path d="M13.6 13c0 3.6.2 6.1.5 7.7" />
     </svg>
   )
 }
