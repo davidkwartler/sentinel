@@ -1,15 +1,19 @@
 import { auth, signIn } from "@/lib/auth"
 import { redirect } from "next/navigation"
 import { ShieldIcon } from "@/components/icons"
+import { SiteHeader } from "@/components/SiteHeader"
 
 export default async function LoginPage() {
   const session = await auth()
   if (session) redirect("/products")
   return (
-    <main className="flex flex-1 items-center justify-center bg-gray-50 py-12">
+    <div className="flex flex-1 flex-col bg-gray-50">
+      {/* showAuth off: the sign-in button would link to this page. */}
+      <SiteHeader session={null} showAuth={false} />
+      <main className="flex flex-1 items-center justify-center py-12">
       <div className="w-full max-w-sm rounded-xl border border-gray-200 bg-white p-8 shadow-sm">
         <h1 className="mb-2 flex items-center justify-center gap-2.5 text-center text-2xl font-semibold leading-none text-gray-900">
-          <ShieldIcon className="h-8 w-8 text-[#7C3AED]" />
+          <ShieldIcon className="h-8 w-8" outlined />
           Sentinel
         </h1>
         <p className="mb-8 text-center text-sm text-gray-500">
@@ -78,6 +82,7 @@ export default async function LoginPage() {
           </div>
         </div>
       </div>
-    </main>
+      </main>
+    </div>
   )
 }

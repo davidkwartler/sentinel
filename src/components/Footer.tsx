@@ -46,7 +46,7 @@ function Divider() {
 export function Footer() {
   return (
     <footer className="border-t border-gray-200 bg-white">
-      <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-center gap-x-4 gap-y-2 px-6 py-4 text-xs sm:justify-start">
+      <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-center gap-x-4 gap-y-2 px-6 py-4 text-xs">
         <Link href="/products" className={linkClass}>
           <Glyph>
             <rect x="2.75" y="3.25" width="6" height="6" rx="1.25" />
