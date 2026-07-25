@@ -74,11 +74,11 @@ export function ProfileSettings() {
     <div className="divide-y divide-gray-100 rounded-lg border border-gray-200 bg-white shadow-sm">
       <Row
         label="Fingerprint source"
-        info="How each device is identified. Pro uses FingerprintJS Pro for higher accuracy and lets the server verify what the browser reports. Open source uses the free agent, which is less stable across sessions. Defaults to Pro when an API key is configured."
+        info="How each device is identified. Pro uses FingerprintJS Pro for higher accuracy and lets the server verify what the browser reports. OSS uses the open-source agent, which is less stable across sessions. Defaults to Pro when an API key is configured."
       >
         <SegmentedControl
           options={[
-            { value: "oss", label: "Open source" },
+            { value: "oss", label: "OSS" },
             { value: "pro", label: "Pro" },
           ]}
           value={fpMode}

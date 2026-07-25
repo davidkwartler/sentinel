@@ -64,15 +64,15 @@ export default async function AccountPage() {
           </Link>
         </div>
         <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <Stat label="Active sessions" value={String(activeSessions)} />
           <Stat
             label="Fingerprints"
             value={currentSession ? String(currentSession._count.fingerprints) : "—"}
           />
           <Stat
-            label="Expires"
+            label="Session expires"
             value={currentSession ? currentSession.expires.toISOString().slice(0, 10) : "—"}
           />
-          <Stat label="Active sessions" value={String(activeSessions)} />
           <Stat
             label="Verification"
             value={verificationOn ? "Server-side" : "Client only"}
