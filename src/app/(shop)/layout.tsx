@@ -12,16 +12,21 @@ export default async function ShopLayout({
   const session = await auth()
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    // flex-1 rather than min-h-screen: the root layout owns full-viewport
+    // height, and claiming it again here pushed the footer below the fold.
+    <div className="flex flex-1 flex-col bg-gray-50">
       <a href="#main-content" className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-2 focus:z-50 focus:rounded-md focus:bg-white focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:text-gray-900 focus:shadow-md">Skip to main content</a>
       <nav aria-label="Main navigation" className="border-b border-gray-200 bg-white">
         <div className="mx-auto flex h-14 max-w-5xl items-center justify-between px-4 sm:px-6">
           <div className="flex items-center gap-3 sm:gap-6">
             <Link
               href="/products"
-              className="flex items-center gap-2 text-lg font-semibold tracking-tight text-gray-900"
+              className="flex items-center gap-2 text-lg font-semibold leading-none tracking-tight text-gray-900"
             >
-              <ShieldIcon className="h-5 w-5 text-[#7C3AED]" />
+              {/* leading-none on the lockup: with default leading, items-center
+                  aligns the mark to the line box including descender space, and
+                  "Sentinel" has no descenders — so the mark reads low. */}
+              <ShieldIcon className="h-6 w-6 text-[#7C3AED]" />
               <span className="hidden sm:inline">Sentinel</span>
             </Link>
             {/* Styled as a button rather than a bare link so it reads as an
