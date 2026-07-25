@@ -36,8 +36,16 @@ function LinkedInIcon() {
   )
 }
 
+// Icons carry the row; the label unfurls to the right on hover or keyboard
+// focus. The width animates from 0 rather than toggling display so the
+// neighbouring icons slide instead of jumping, and the label stays in the DOM
+// as the link's accessible name — screen readers and search crawlers read
+// "Account", not an unlabelled icon.
 const linkClass =
-  "flex items-center gap-1.5 text-gray-500 transition-colors hover:text-gray-900"
+  "group flex items-center text-gray-500 transition-colors hover:text-gray-900 focus-visible:text-gray-900 focus-visible:outline-none"
+
+const labelClass =
+  "max-w-0 overflow-hidden whitespace-nowrap opacity-0 transition-all duration-200 ease-out group-hover:ml-1.5 group-hover:max-w-24 group-hover:opacity-100 group-focus-visible:ml-1.5 group-focus-visible:max-w-24 group-focus-visible:opacity-100 motion-reduce:transition-none"
 
 function Divider() {
   return <span className="hidden text-gray-300 sm:inline">|</span>
@@ -46,10 +54,10 @@ function Divider() {
 export function Footer() {
   return (
     <footer className="border-t border-gray-200 bg-white">
-      {/* Three groups, each flex-nowrap, so only whole groups move to the next
-          line as the viewport narrows — GitHub can never drop away from
-          LinkedIn. Only the outer row wraps. */}
-      <div className="mx-auto flex max-w-5xl flex-col flex-wrap items-center justify-center gap-x-4 gap-y-2 px-6 py-4 text-xs sm:flex-row">
+      {/* Icons first, copyright last. The icon strip is one flex-nowrap group
+          so it stays a single line and only the copyright drops below it on a
+          phone — two lines, never a broken-up strip. */}
+      <div className="mx-auto flex max-w-5xl flex-col items-center justify-center gap-x-4 gap-y-2 px-6 py-4 text-xs sm:flex-row">
         <div className="flex flex-nowrap items-center gap-x-4">
           <Link href="/products" className={linkClass}>
             <Glyph>
@@ -58,14 +66,14 @@ export function Footer() {
               <rect x="2.75" y="10.75" width="6" height="6" rx="1.25" />
               <rect x="11.25" y="10.75" width="6" height="6" rx="1.25" />
             </Glyph>
-            Products
+            <span className={labelClass}>Products</span>
           </Link>
           <Link href="/account" className={linkClass}>
             <Glyph>
               <circle cx="10" cy="7" r="3" />
               <path d="M4.5 16.25a5.5 5.5 0 0 1 11 0" />
             </Glyph>
-            Account
+            <span className={labelClass}>Account</span>
           </Link>
           <Link href="/sessions" className={linkClass}>
             <Glyph>
@@ -73,19 +81,8 @@ export function Footer() {
               <path d="M7 16.75h6" />
               <path d="M10 14.25v2.5" />
             </Glyph>
-            Sessions
+            <span className={labelClass}>Sessions</span>
           </Link>
-        </div>
-
-        <Divider />
-
-        <p className="whitespace-nowrap text-gray-500">
-          &copy; {new Date().getFullYear()} David Kwartler. All rights reserved.
-        </p>
-
-        <Divider />
-
-        <div className="flex flex-nowrap items-center gap-x-4">
           <a
             href="https://www.linkedin.com/in/dkwartler/"
             target="_blank"
@@ -93,7 +90,7 @@ export function Footer() {
             className={linkClass}
           >
             <LinkedInIcon />
-            LinkedIn
+            <span className={labelClass}>LinkedIn</span>
           </a>
           <a
             href="https://github.com/davidkwartler/sentinel"
@@ -102,9 +99,15 @@ export function Footer() {
             className={linkClass}
           >
             <GitHubIcon />
-            GitHub
+            <span className={labelClass}>GitHub</span>
           </a>
         </div>
+
+        <Divider />
+
+        <p className="whitespace-nowrap text-gray-500">
+          &copy; {new Date().getFullYear()} David Kwartler. All rights reserved.
+        </p>
       </div>
     </footer>
   )

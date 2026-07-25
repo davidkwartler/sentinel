@@ -211,7 +211,9 @@ export function FingerprintReporter() {
   )
 
   return (
-    <div className="fixed bottom-4 right-4 z-50 flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-xs shadow-md transition-opacity">
+    // bottom-20 clears the footer (≈49px tall) when the page is scrolled to
+    // the end — at bottom-4 the toast sat half on top of it.
+    <div className="fixed bottom-20 right-4 z-50 flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-xs shadow-md transition-opacity">
       {status === "capturing" && (
         <>
           <FingerprintIcon className="animate-pulse text-[#F35B22]" />
