@@ -56,7 +56,7 @@ export function ShieldIcon({
       <path
         d={SHIELD_PATH}
         stroke={outlined ? BRAND_VIOLET_DARK : undefined}
-        strokeWidth={outlined ? 1.2 : undefined}
+        strokeWidth={outlined ? 2 : undefined}
         strokeLinejoin="round"
       />
     </svg>

@@ -46,58 +46,65 @@ function Divider() {
 export function Footer() {
   return (
     <footer className="border-t border-gray-200 bg-white">
+      {/* Three groups, each flex-nowrap, so only whole groups move to the next
+          line as the viewport narrows — GitHub can never drop away from
+          LinkedIn. Only the outer row wraps. */}
       <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-center gap-x-4 gap-y-2 px-6 py-4 text-xs">
-        <Link href="/products" className={linkClass}>
-          <Glyph>
-            <rect x="2.75" y="3.25" width="6" height="6" rx="1.25" />
-            <rect x="11.25" y="3.25" width="6" height="6" rx="1.25" />
-            <rect x="2.75" y="10.75" width="6" height="6" rx="1.25" />
-            <rect x="11.25" y="10.75" width="6" height="6" rx="1.25" />
-          </Glyph>
-          Products
-        </Link>
-        <Link href="/account" className={linkClass}>
-          <Glyph>
-            <circle cx="10" cy="7" r="3" />
-            <path d="M4.5 16.25a5.5 5.5 0 0 1 11 0" />
-          </Glyph>
-          Account
-        </Link>
-        <Link href="/sessions" className={linkClass}>
-          <Glyph>
-            <rect x="2.75" y="4.25" width="14.5" height="10" rx="1.5" />
-            <path d="M7 16.75h6" />
-            <path d="M10 14.25v2.5" />
-          </Glyph>
-          Sessions
-        </Link>
+        <div className="flex flex-nowrap items-center gap-x-4">
+          <Link href="/products" className={linkClass}>
+            <Glyph>
+              <rect x="2.75" y="3.25" width="6" height="6" rx="1.25" />
+              <rect x="11.25" y="3.25" width="6" height="6" rx="1.25" />
+              <rect x="2.75" y="10.75" width="6" height="6" rx="1.25" />
+              <rect x="11.25" y="10.75" width="6" height="6" rx="1.25" />
+            </Glyph>
+            Products
+          </Link>
+          <Link href="/account" className={linkClass}>
+            <Glyph>
+              <circle cx="10" cy="7" r="3" />
+              <path d="M4.5 16.25a5.5 5.5 0 0 1 11 0" />
+            </Glyph>
+            Account
+          </Link>
+          <Link href="/sessions" className={linkClass}>
+            <Glyph>
+              <rect x="2.75" y="4.25" width="14.5" height="10" rx="1.5" />
+              <path d="M7 16.75h6" />
+              <path d="M10 14.25v2.5" />
+            </Glyph>
+            Sessions
+          </Link>
+        </div>
 
         <Divider />
 
-        <p className="text-gray-500">
+        <p className="whitespace-nowrap text-gray-500">
           &copy; {new Date().getFullYear()} David Kwartler. All rights reserved.
         </p>
 
         <Divider />
 
-        <a
-          href="https://www.linkedin.com/in/dkwartler/"
-          target="_blank"
-          rel="noopener noreferrer"
-          className={linkClass}
-        >
-          <LinkedInIcon />
-          LinkedIn
-        </a>
-        <a
-          href="https://github.com/davidkwartler/sentinel"
-          target="_blank"
-          rel="noopener noreferrer"
-          className={linkClass}
-        >
-          <GitHubIcon />
-          GitHub
-        </a>
+        <div className="flex flex-nowrap items-center gap-x-4">
+          <a
+            href="https://www.linkedin.com/in/dkwartler/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className={linkClass}
+          >
+            <LinkedInIcon />
+            LinkedIn
+          </a>
+          <a
+            href="https://github.com/davidkwartler/sentinel"
+            target="_blank"
+            rel="noopener noreferrer"
+            className={linkClass}
+          >
+            <GitHubIcon />
+            GitHub
+          </a>
+        </div>
       </div>
     </footer>
   )
