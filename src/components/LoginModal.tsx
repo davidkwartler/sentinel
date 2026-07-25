@@ -27,7 +27,7 @@ export function LoginModal({ signInAction }: { signInAction: () => void }) {
       <div className="relative w-full max-w-sm rounded-xl border border-gray-200 bg-white p-8 shadow-lg">
         <button
           onClick={dismiss}
-          className="absolute right-3 top-3 flex h-8 w-8 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+          className="absolute right-3 top-3 flex h-8 w-8 items-center justify-center rounded-full text-gray-500 hover:bg-gray-100 hover:text-gray-600"
           aria-label="Close"
         >
           ✕
@@ -37,7 +37,7 @@ export function LoginModal({ signInAction }: { signInAction: () => void }) {
           Sentinel
         </h1>
         <p className="mb-8 text-center text-sm text-gray-500">
-          Session hijack detection, demonstrated on a sample storefront
+          Session hijack detection demo
         </p>
         <GoogleSignInButton action={signInAction} />
         <HowItWorks />

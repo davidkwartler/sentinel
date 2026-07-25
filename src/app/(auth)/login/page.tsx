@@ -20,7 +20,7 @@ export default async function LoginPage() {
           Sentinel
         </h1>
         <p className="mb-8 text-center text-sm text-gray-500">
-          Session hijack detection, demonstrated on a sample storefront
+          Session hijack detection demo
         </p>
         <GoogleSignInButton
           action={async () => {

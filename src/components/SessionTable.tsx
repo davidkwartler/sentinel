@@ -75,7 +75,7 @@ export function SessionTable({
     return (
       <div className="rounded-lg border border-gray-200 bg-white p-12 text-center shadow-sm">
         <p className="text-sm font-medium text-gray-700">No active sessions</p>
-        <p className="mx-auto mt-2 max-w-sm text-xs leading-relaxed text-gray-400">
+        <p className="mx-auto mt-2 max-w-sm text-xs leading-relaxed text-gray-500">
           Sessions appear here once you sign in and a fingerprint is recorded.
           To see detection work, follow the hijack simulation in the README:
           copy your <code className="font-mono">auth_session</code> cookie into a
@@ -132,7 +132,7 @@ export function SessionTable({
                       </span>
                     )}
                   </div>
-                  <p className="mt-0.5 truncate text-xs text-gray-400">
+                  <p className="mt-0.5 truncate text-xs text-gray-500">
                     {original?.ip ?? "No IP"}
                     {original?.browser && original?.os
                       ? ` · ${original.browser} on ${original.os}`
@@ -196,7 +196,7 @@ export function SessionTable({
                     Session fingerprints
                   </p>
                   {fpCount > 1 && (
-                    <p className="text-[11px] text-gray-400">
+                    <p className="text-[11px] text-gray-500">
                       Red values differ from the original fingerprint
                     </p>
                   )}
@@ -220,7 +220,7 @@ export function SessionTable({
                           <p className="font-medium text-gray-700">
                             {isOrig ? "Original (established session)" : `Later fingerprint #${i}`}
                           </p>
-                          <p className="text-[10px] text-gray-400">
+                          <p className="text-[10px] text-gray-500">
                             <RelativeTime value={f.createdAt} />
                           </p>
                         </div>
@@ -288,7 +288,7 @@ function StatCard({
     tone === "danger"
       ? "text-red-600"
       : tone === "pending"
-        ? "text-amber-600"
+        ? "text-amber-700"
         : "text-gray-900"
   return (
     <div className="rounded-lg border border-gray-200 bg-white px-4 py-3 shadow-sm">
@@ -319,7 +319,7 @@ function ConfidenceMeter({
       </div>
       <span
         className={`text-xs font-semibold tabular-nums ${
-          flagged ? "text-red-600" : "text-green-600"
+          flagged ? "text-red-600" : "text-green-700"
         }`}
       >
         {score}
@@ -370,7 +370,7 @@ function FpField({
 }) {
   return (
     <div className="flex justify-between gap-2">
-      <span className="text-gray-400">{label}</span>
+      <span className="text-gray-500">{label}</span>
       <span
         className={`truncate text-right ${
           diff ? "font-medium text-red-600" : "text-gray-600"
