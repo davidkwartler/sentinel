@@ -49,7 +49,7 @@ export function Footer() {
       {/* Three groups, each flex-nowrap, so only whole groups move to the next
           line as the viewport narrows — GitHub can never drop away from
           LinkedIn. Only the outer row wraps. */}
-      <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-center gap-x-4 gap-y-2 px-6 py-4 text-xs">
+      <div className="mx-auto flex max-w-5xl flex-col flex-wrap items-center justify-center gap-x-4 gap-y-2 px-6 py-4 text-xs sm:flex-row">
         <div className="flex flex-nowrap items-center gap-x-4">
           <Link href="/products" className={linkClass}>
             <Glyph>

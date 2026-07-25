@@ -141,7 +141,7 @@ function Row({
   children: React.ReactNode
 }) {
   return (
-    <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-4">
+    <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-4 sm:px-5">
       <div className="flex items-center gap-1.5">
         <span className="text-sm font-medium text-gray-900">{label}</span>
         <InfoTip label={label}>{info}</InfoTip>
@@ -177,7 +177,7 @@ function SegmentedControl({
             onClick={() => !disabled && onChange(opt.value)}
             disabled={disabled}
             aria-pressed={selected}
-            className={`rounded px-3 py-1.5 text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-900 focus-visible:ring-offset-1 ${
+            className={`rounded px-2 py-1.5 text-xs font-medium transition-colors sm:px-3 sm:text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-900 focus-visible:ring-offset-1 ${
               selected
                 ? "bg-gray-900 text-white shadow-sm"
                 : "text-gray-700 hover:bg-gray-200 hover:text-gray-900"

@@ -20,21 +20,28 @@ export default async function ProductsPage() {
       <p className="mb-6 text-sm text-gray-500">
         Browse our collection of products.
       </p>
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+      {/* One column of rows on phones, cards from sm up. Two 155px cards side
+          by side left the name and price cramped; a full-width row gives the
+          text the whole line. */}
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4">
         {products.map((product) => (
           <Link
             key={product.id}
             href={`/products/${product.id}`}
-            className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm transition-shadow hover:shadow-md"
+            className="flex items-center gap-4 rounded-lg border border-gray-200 bg-white p-3 shadow-sm transition-shadow hover:shadow-md sm:block sm:p-4"
           >
-            <div className="mb-3 flex h-24 items-center justify-center rounded-md bg-gray-50 text-4xl">
+            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-md bg-gray-50 text-3xl sm:mb-3 sm:h-24 sm:w-auto sm:text-4xl">
               {product.image}
             </div>
-            <p className="text-xs text-gray-400">{product.category}</p>
-            <p className="text-sm font-medium text-gray-900">{product.name}</p>
-            <p className="mt-1 text-sm font-semibold text-gray-700">
-              ${product.price.toFixed(2)}
-            </p>
+            <div className="min-w-0 flex-1">
+              <p className="text-xs text-gray-400">{product.category}</p>
+              <p className="truncate text-sm font-medium text-gray-900 sm:whitespace-normal">
+                {product.name}
+              </p>
+              <p className="mt-1 text-sm font-semibold text-gray-700">
+                ${product.price.toFixed(2)}
+              </p>
+            </div>
           </Link>
         ))}
       </div>
