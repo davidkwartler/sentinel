@@ -103,7 +103,8 @@ type FpStatus = "idle" | "capturing" | "done" | "cached"
 // Fingerprint glyph from Ionicons v5 (MIT licensed, ionic-team/ionicons).
 // Inlined rather than pulled from an icon package to keep the toast
 // dependency-free; fill=currentColor so callers set the color, which is
-// Fingerprint's brand orange (#F04405) throughout the toast.
+// Fingerprint's brand orange, Orange 7 (#F35B22) per their 2024 brand
+// guidelines, throughout the toast.
 function FingerprintIcon({ className = "" }: { className?: string }) {
   return (
     <svg
@@ -205,21 +206,21 @@ export function FingerprintReporter() {
     <div className="fixed bottom-4 right-4 z-50 flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-xs shadow-md transition-opacity">
       {status === "capturing" && (
         <>
-          <FingerprintIcon className="animate-pulse text-[#F04405]" />
+          <FingerprintIcon className="animate-pulse text-[#F35B22]" />
           <span className="text-gray-600">Registering fingerprint…</span>
           {modeBadge}
         </>
       )}
       {status === "done" && (
         <>
-          <FingerprintIcon className="text-[#F04405]" />
+          <FingerprintIcon className="text-[#F35B22]" />
           <span className="text-gray-600">Fingerprint registered</span>
           {modeBadge}
         </>
       )}
       {status === "cached" && (
         <>
-          <FingerprintIcon className="text-[#F04405] opacity-60" />
+          <FingerprintIcon className="text-[#F35B22] opacity-60" />
           <span className="text-gray-400">Fingerprint on file</span>
           {modeBadge}
         </>
