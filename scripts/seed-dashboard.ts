@@ -183,7 +183,7 @@ async function main() {
   console.log("Created FLAGGED session:", s5.id)
 
   console.log("\nDone! 5 test sessions created (2 FLAGGED, 1 CLEAR, 1 PENDING, 1 ACTIVE)")
-  console.log("Refresh /dashboard to see them.")
+  console.log("Refresh /sessions to see them.")
 }
 
 main().catch(console.error).finally(() => prisma.$disconnect())

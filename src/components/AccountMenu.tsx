@@ -96,7 +96,7 @@ export function AccountMenu({
 
           <div className="py-1">
             <Link
-              href="/profile"
+              href="/account"
               role="menuitem"
               onClick={() => setOpen(false)}
               className="block px-3 py-2 text-sm text-gray-900 hover:bg-gray-50"
@@ -104,7 +104,7 @@ export function AccountMenu({
               Account settings
             </Link>
             <Link
-              href="/dashboard"
+              href="/sessions"
               role="menuitem"
               onClick={() => setOpen(false)}
               className="block px-3 py-2 text-sm text-gray-900 hover:bg-gray-50"

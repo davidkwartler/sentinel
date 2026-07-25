@@ -83,7 +83,7 @@ export default async function ProfilePage() {
             </dl>
             <div className="mt-4 border-t border-gray-100 pt-3">
               <Link
-                href="/dashboard"
+                href="/sessions"
                 className="text-sm text-gray-700 underline underline-offset-2 hover:text-gray-900"
               >
                 {flaggedCount > 0

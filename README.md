@@ -6,8 +6,8 @@
 
 Sentinel is a Next.js application that detects when a stolen session cookie is used from a
 different device. When a fingerprint mismatch is detected, Claude analyzes the evidence and
-assigns a confidence score. Flagged sessions appear on the security dashboard with Claude's
-full reasoning.
+assigns a confidence score. Flagged sessions appear on the session monitoring page with
+Claude's full reasoning.
 
 <img width="1000" height="454" alt="Session hijack detected" src="https://github.com/user-attachments/assets/43a3a6eb-4661-4ec7-8f5d-be39b6086388" />
 <img width="1000" height="411" alt="Session hijack false positive" src="https://github.com/user-attachments/assets/a00a124c-d524-4b48-99db-23a29f415861" />
@@ -31,7 +31,7 @@ Browser (Device A)
             |                                  confidenceScore >= threshold (default 70) -> FLAGGED
             |                                  confidenceScore <  threshold -> CLEAR
             |                                  (analysis "Off" -> flag on mismatch alone)
-            +-> /dashboard (polls 8s) -> SessionTable -> FLAGGED badge -> expandable reasoning
+            +-> /sessions (polls 8s) -> SessionTable -> FLAGGED badge -> expandable reasoning
 ```
 
 **Tech stack:** Next.js 16 · Auth.js v5 · FingerprintJS Pro · Prisma 7 · Neon PostgreSQL ·
@@ -121,14 +121,14 @@ This walkthrough reproduces a session cookie theft and detection end-to-end.
 2. FingerprintJS records Browser B's visitorId — different from Browser A's
 3. The detection engine flags the mismatch and dispatches Claude asynchronously
 4. Wait **10-15 seconds** for Claude to complete analysis
-5. In **Browser A**, navigate to `/dashboard`
-6. The dashboard shows the session with a red **FLAGGED** badge
+5. In **Browser A**, navigate to `/sessions`
+6. The session monitoring page shows the session with a red **FLAGGED** badge
 7. Click the flagged row to expand Claude's reasoning transcript
 
 > **FingerprintJS Pro note:** The app defaults to Pro mode when
 > `NEXT_PUBLIC_FINGERPRINT_API_KEY` is set, and falls back to OSS mode
 > (open-source FingerprintJS) otherwise. You can switch modes at any time from
-> `/profile` -> **Fingerprint Mode**. In OSS mode, fingerprints are less stable
+> `/account` -> **Fingerprint Mode**. In OSS mode, fingerprints are less stable
 > but the detection pipeline still functions for demo purposes.
 
 > **Server-side verification:** When `FINGERPRINT_SERVER_API_KEY` is set, the
@@ -187,8 +187,8 @@ src/
 │   ├── (shop)/           # Auth-aware route group (guests can browse; cart + fingerprinting require auth)
 │   │   ├── layout.tsx    # Shared nav + FingerprintReporter
 │   │   ├── products/     # Product listing
-│   │   ├── profile/      # User profile
-│   │   └── dashboard/    # Security dashboard (SessionTable, PollingRefresher)
+│   │   ├── account/      # Account settings (fingerprint mode, model, threshold)
+│   │   └── sessions/     # Session monitoring (SessionTable, PollingRefresher)
 │   ├── api/
 │   │   └── session/record/  # POST: fingerprint ingest + detection + Claude dispatch
 │   └── login/            # Sign-in page
