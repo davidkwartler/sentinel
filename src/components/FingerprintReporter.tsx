@@ -33,6 +33,9 @@ interface FingerprintPayload {
   timezone: string
   modelOverride?: string
   thresholdOverride?: number
+  // Tells the server whether requestId is resolvable against Fingerprint's
+  // server API (Pro) or is a locally generated UUID (OSS).
+  mode?: "pro" | "oss"
 }
 
 // Loading the Pro SDK is network-bound; memoize the client at module level so
@@ -61,6 +64,7 @@ async function capturePro(modelOverride?: string): Promise<FingerprintPayload | 
       screenRes: `${screen.width}x${screen.height}`,
       timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
       modelOverride,
+      mode: "pro",
     }
   } catch (err) {
     console.warn("[Sentinel] Pro fingerprint failed:", err)
@@ -84,6 +88,7 @@ async function captureOss(modelOverride?: string): Promise<FingerprintPayload> {
     screenRes: `${screen.width}x${screen.height}`,
     timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
     modelOverride,
+    mode: "oss",
   }
 }
 

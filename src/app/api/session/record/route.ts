@@ -5,6 +5,7 @@ import { z } from "zod"
 import { runDetection } from "@/lib/detection"
 import { analyzeDetectionEvent } from "@/lib/claude"
 import { ANALYSIS_MODEL_IDS, ANALYSIS_OFF } from "@/lib/settings"
+import { verifyFingerprint } from "@/lib/fingerprint-server"
 
 // Length caps double as prompt-injection hardening: these values are
 // interpolated into the Claude analysis prompt, so keep them short and
@@ -19,6 +20,9 @@ const fingerprintSchema = z.object({
   timezone: z.string().max(64).optional(),
   modelOverride: z.enum(ANALYSIS_MODEL_IDS).optional(),
   thresholdOverride: z.number().int().min(0).max(100).optional(),
+  // Only Pro requestIds are resolvable against Fingerprint's server API; OSS
+  // mode generates a local UUID, so verification is skipped for it.
+  mode: z.enum(["pro", "oss"]).optional(),
 })
 
 // Each mismatched fingerprint triggers a Claude call, so an authenticated
@@ -55,11 +59,31 @@ export async function POST(request: NextRequest) {
 
   const data = parsed.data
 
+  // Ask Fingerprint's server API what it actually observed for this requestId,
+  // and prefer that over anything the client told us about itself. Returns null
+  // when no server key is configured or the lookup fails, in which case we fall
+  // back to the client-reported values.
+  const verified =
+    data.mode === "oss" ? null : await verifyFingerprint(data.requestId, data)
+
+  if (verified?.clientMismatch) {
+    console.warn(
+      "[fingerprint] client-reported components disagree with server for",
+      data.requestId,
+    )
+  }
+
+  const visitorId = verified?.visitorId ?? data.visitorId
+  const os = verified?.os ?? data.os ?? null
+  const browser = verified?.browser ?? data.browser ?? null
+  const signals = verified?.signals ?? null
+
   const ip =
+    verified?.ip ??
     request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
     request.headers.get("x-real-ip") ??
     null
-  const userAgent = request.headers.get("user-agent") ?? null
+  const userAgent = verified?.userAgent ?? request.headers.get("user-agent") ?? null
 
   // Dedupe check, isOriginal decision, insert, and detection all commit atomically.
   // Serializable isolation prevents two concurrent first-loads (React strict mode,
@@ -98,12 +122,12 @@ export async function POST(request: NextRequest) {
           const fingerprint = await tx.fingerprint.create({
             data: {
               sessionId: dbSession.id,
-              visitorId: data.visitorId,
+              visitorId,
               requestId: data.requestId,
               ip,
               userAgent,
-              os: data.os ?? null,
-              browser: data.browser ?? null,
+              os,
+              browser,
               screenRes: data.screenRes ?? null,
               timezone: data.timezone ?? null,
               isOriginal: !hasExisting,
@@ -112,10 +136,10 @@ export async function POST(request: NextRequest) {
 
           const detection = await runDetection(tx, {
             sessionId: dbSession.id,
-            newVisitorId: data.visitorId,
+            newVisitorId: visitorId,
             newIp: ip,
-            os: data.os ?? null,
-            browser: data.browser ?? null,
+            os,
+            browser,
             screenRes: data.screenRes ?? null,
             timezone: data.timezone ?? null,
           })
@@ -164,7 +188,12 @@ export async function POST(request: NextRequest) {
           return
         }
 
-        await analyzeDetectionEvent(eventId, modelOverride, data.thresholdOverride)
+        await analyzeDetectionEvent(
+          eventId,
+          modelOverride,
+          data.thresholdOverride,
+          signals ?? undefined,
+        )
       } catch (err) {
         // Fail closed: a broken analysis pipeline must not let a suspicious
         // session pass silently, so flag it rather than leaving it PENDING.
