@@ -4,7 +4,12 @@ import { prisma } from "@/lib/db"
 import { z } from "zod"
 import { runDetection } from "@/lib/detection"
 import { analyzeDetectionEvent } from "@/lib/claude"
-import { ANALYSIS_MODEL_IDS, ANALYSIS_OFF } from "@/lib/settings"
+import {
+  ANALYSIS_MODEL_IDS,
+  ANALYSIS_OFF,
+  MAX_FLAG_THRESHOLD,
+  MIN_FLAG_THRESHOLD,
+} from "@/lib/settings"
 import { verifyFingerprint } from "@/lib/fingerprint-server"
 
 // Length caps double as prompt-injection hardening: these values are
@@ -19,7 +24,12 @@ const fingerprintSchema = z.object({
   screenRes: z.string().max(32).optional(),
   timezone: z.string().max(64).optional(),
   modelOverride: z.enum(ANALYSIS_MODEL_IDS).optional(),
-  thresholdOverride: z.number().int().min(0).max(100).optional(),
+  thresholdOverride: z
+    .number()
+    .int()
+    .min(MIN_FLAG_THRESHOLD)
+    .max(MAX_FLAG_THRESHOLD)
+    .optional(),
   // Only Pro requestIds are resolvable against Fingerprint's server API; OSS
   // mode generates a local UUID, so verification is skipped for it.
   mode: z.enum(["pro", "oss"]).optional(),

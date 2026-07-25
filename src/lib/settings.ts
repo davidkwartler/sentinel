@@ -21,6 +21,17 @@ export const ANALYSIS_OFF = "off"
 // Overridable per-request via the profile settings slider.
 export const DEFAULT_FLAG_THRESHOLD = 70
 
+// Floor for the adjustable threshold. Below roughly this level every mismatch
+// flags, which makes the analysis decorative — the score stops changing the
+// outcome. Enforced in the UI and again server-side.
+export const MIN_FLAG_THRESHOLD = 20
+export const MAX_FLAG_THRESHOLD = 100
+
+/** Clamp a stored or submitted threshold into the supported range. */
+export function clampThreshold(value: number): number {
+  return Math.min(MAX_FLAG_THRESHOLD, Math.max(MIN_FLAG_THRESHOLD, Math.round(value)))
+}
+
 export const MODEL_OPTIONS = [
   { value: "claude-haiku-4-5", label: "Haiku 4.5" },
   { value: "claude-sonnet-5", label: "Sonnet 5" },

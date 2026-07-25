@@ -5,7 +5,13 @@ import {
   FingerprintJSPro,
   type ExtendedGetResult,
 } from "@fingerprintjs/fingerprintjs-pro-spa"
-import { FP_CACHE_KEY, FP_MODE_KEY, MODEL_KEY, THRESHOLD_KEY } from "@/lib/settings"
+import {
+  clampThreshold,
+  FP_CACHE_KEY,
+  FP_MODE_KEY,
+  MODEL_KEY,
+  THRESHOLD_KEY,
+} from "@/lib/settings"
 
 function parseUserAgent(ua: string): { os: string; browser: string } {
   let os = "Unknown"
@@ -138,8 +144,8 @@ export function FingerprintReporter() {
     const modelOverride = localStorage.getItem(MODEL_KEY) || undefined
     const storedThreshold = Number(localStorage.getItem(THRESHOLD_KEY))
     const thresholdOverride =
-      Number.isInteger(storedThreshold) && storedThreshold >= 0 && storedThreshold <= 100 && localStorage.getItem(THRESHOLD_KEY) !== null
-        ? storedThreshold
+      localStorage.getItem(THRESHOLD_KEY) !== null && Number.isFinite(storedThreshold)
+        ? clampThreshold(storedThreshold)
         : undefined
 
     let cancelled = false

@@ -4,7 +4,10 @@ import { useEffect, useState } from "react"
 
 import {
   ANALYSIS_OFF,
+  clampThreshold,
   DEFAULT_FLAG_THRESHOLD,
+  MAX_FLAG_THRESHOLD,
+  MIN_FLAG_THRESHOLD,
   DEFAULT_MODEL,
   FP_CACHE_KEY,
   FP_MODE_KEY,
@@ -35,9 +38,11 @@ export function ProfileSettings() {
         ? localStorage.getItem(MODEL_KEY) || DEFAULT_MODEL
         : DEFAULT_MODEL,
     )
+    // Clamp on read as well as write — a value stored before the floor existed
+    // would otherwise leave the slider out of range.
     const storedThreshold = Number(localStorage.getItem(THRESHOLD_KEY))
-    if (Number.isInteger(storedThreshold) && storedThreshold >= 0 && storedThreshold <= 100 && localStorage.getItem(THRESHOLD_KEY) !== null) {
-      setThreshold(storedThreshold)
+    if (localStorage.getItem(THRESHOLD_KEY) !== null && Number.isFinite(storedThreshold)) {
+      setThreshold(clampThreshold(storedThreshold))
     }
     setMounted(true)
   }, [])
@@ -55,8 +60,9 @@ export function ProfileSettings() {
   }
 
   function handleThresholdChange(value: number) {
-    setThreshold(value)
-    localStorage.setItem(THRESHOLD_KEY, String(value))
+    const clamped = clampThreshold(value)
+    setThreshold(clamped)
+    localStorage.setItem(THRESHOLD_KEY, String(clamped))
   }
 
   if (!mounted) return null
@@ -142,8 +148,8 @@ export function ProfileSettings() {
           </p>
           <input
             type="range"
-            min={0}
-            max={100}
+            min={MIN_FLAG_THRESHOLD}
+            max={MAX_FLAG_THRESHOLD}
             step={5}
             value={threshold}
             disabled={model === ANALYSIS_OFF}
@@ -153,7 +159,8 @@ export function ProfileSettings() {
           />
           <p className="mt-2 text-[11px] italic text-gray-400">
             Defaults to {DEFAULT_FLAG_THRESHOLD}; adjust higher or lower based
-            on your security posture.
+            on your security posture. Won&apos;t go below {MIN_FLAG_THRESHOLD},
+            where every mismatch would flag regardless of the score.
             {model === ANALYSIS_OFF && " Not used while GenAI analysis is off."}
           </p>
         </div>
