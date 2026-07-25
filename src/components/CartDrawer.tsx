@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import { useCart } from "./CartProvider"
+import { CartIcon } from "@/components/icons"
 
 export function CartDrawer() {
   const { items, totalItems, totalPrice, updateQty, removeItem, clearCart } =
@@ -15,9 +16,10 @@ export function CartDrawer() {
         <button
           onClick={() => setOpen(true)}
           aria-label={totalItems > 0 ? `Cart, ${totalItems} items` : "Cart"}
-          className="relative rounded-md border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-700 shadow-sm transition-colors hover:bg-gray-50"
+          className="relative flex items-center gap-1.5 rounded-md border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-700 shadow-sm transition-colors hover:bg-gray-50"
         >
-          🛒 Cart
+          <CartIcon className="h-4 w-4 text-gray-500" />
+          Cart
           {totalItems > 0 && (
             <span className="absolute -right-2 -top-2 flex h-5 w-5 items-center justify-center rounded-full bg-gray-900 text-[10px] font-medium text-white">
               {totalItems}

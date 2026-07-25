@@ -2,6 +2,7 @@ import Link from "next/link"
 import { auth, signOut } from "@/lib/auth"
 import { FingerprintReporter } from "@/components/FingerprintReporter"
 import { AccountMenu } from "@/components/AccountMenu"
+import { GridIcon, ShieldIcon, SignInIcon } from "@/components/icons"
 
 export default async function ShopLayout({
   children,
@@ -18,16 +19,19 @@ export default async function ShopLayout({
           <div className="flex items-center gap-3 sm:gap-6">
             <Link
               href="/products"
-              className="text-sm font-semibold text-gray-900"
+              className="flex items-center gap-2 text-lg font-semibold tracking-tight text-gray-900"
             >
-              <span className="sm:hidden">🛡️</span>
-              <span className="hidden sm:inline">🛡️ Sentinel</span>
+              <ShieldIcon className="h-5 w-5 text-[#7C3AED]" />
+              <span className="hidden sm:inline">Sentinel</span>
             </Link>
+            {/* Styled as a button rather than a bare link so it reads as an
+                action next to the wordmark instead of part of it. */}
             <Link
               href="/products"
-              className="text-sm text-gray-600 hover:text-gray-900"
+              className="flex items-center gap-1.5 rounded-full border border-gray-300 px-3 py-1.5 text-sm text-gray-700 transition-colors hover:border-gray-400 hover:bg-gray-50 hover:text-gray-900"
             >
-              Products
+              <GridIcon className="h-4 w-4 text-gray-500" />
+              Product catalog
             </Link>
           </div>
           <div className="flex items-center gap-3 sm:gap-4">
@@ -44,9 +48,10 @@ export default async function ShopLayout({
             ) : (
               <Link
                 href="/login"
-                className="rounded-md bg-gray-900 px-4 py-1.5 text-sm font-medium text-white transition-colors hover:bg-gray-800"
+                className="flex items-center gap-1.5 rounded-full bg-gray-900 px-4 py-1.5 text-sm font-medium text-white transition-colors hover:bg-gray-800"
               >
-                🔐 Sign in
+                <SignInIcon className="h-4 w-4" />
+                Sign in
               </Link>
             )}
           </div>
