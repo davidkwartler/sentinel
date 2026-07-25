@@ -24,3 +24,18 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* Every focusable element, not just the ones with utility classes on them.
+   Links (the nav, product cards, the footer) carried no focus styles at all,
+   so they fell through to the browser's default blue outline — which is why
+   violet appeared on buttons but blue still showed elsewhere. Components that
+   set their own focus-visible ring override this. */
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+[tabindex]:focus-visible {
+  outline: 2px solid #7c3aed;
+  outline-offset: 2px;
+}
