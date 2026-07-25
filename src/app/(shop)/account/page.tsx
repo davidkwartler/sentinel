@@ -42,8 +42,7 @@ export default async function AccountPage() {
     <div>
       <h1 className="mb-1 text-2xl font-semibold text-gray-900">Account</h1>
       <p className="mb-6 text-sm text-gray-500">
-        Your identity, the session you are browsing from, and how detection
-        behaves.
+        View account info and adjust session hijack detection settings.
       </p>
 
       {/* Identity. Name and email appear here and nowhere else on the page. */}

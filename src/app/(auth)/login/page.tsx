@@ -1,5 +1,6 @@
 import { auth, signIn } from "@/lib/auth"
 import { redirect } from "next/navigation"
+import { ShieldIcon } from "@/components/icons"
 
 export default async function LoginPage() {
   const session = await auth()
@@ -7,8 +8,9 @@ export default async function LoginPage() {
   return (
     <main className="flex min-h-screen items-center justify-center bg-gray-50">
       <div className="w-full max-w-sm rounded-xl border border-gray-200 bg-white p-8 shadow-sm">
-        <h1 className="mb-2 text-center text-2xl font-semibold text-gray-900">
-          🛡️ Sentinel
+        <h1 className="mb-2 flex items-center justify-center gap-2 text-center text-2xl font-semibold text-gray-900">
+          <ShieldIcon className="h-6 w-6 text-[#7C3AED]" />
+          Sentinel
         </h1>
         <p className="mb-8 text-center text-sm text-gray-500">
           Session hijack detection dashboard

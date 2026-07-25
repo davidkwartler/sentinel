@@ -64,12 +64,9 @@ export default async function DashboardPage() {
     <div>
       <PollingRefresher intervalMs={8000} />
       <div className="mb-6">
-        <h1 className="mb-1 text-2xl font-semibold text-gray-900">
-          Session Monitoring
-        </h1>
+        <h1 className="mb-1 text-2xl font-semibold text-gray-900">Sessions</h1>
         <p className="text-sm text-gray-500">
-          Every active session for your account, and what the detection engine
-          made of it.
+          View sessions, fingerprints, and detection engine outcomes.
         </p>
       </div>
       <SessionTable
