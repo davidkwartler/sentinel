@@ -19,8 +19,10 @@ full reasoning.
 ```
 Browser (Device A)
     | Google OAuth -> auth_session cookie (HttpOnly, SameSite=Lax)
-    | Page load -> FingerprintJS Pro -> visitorId
+    | Page load -> FingerprintJS Pro -> visitorId + requestId
     +-> POST /api/session/record
+            | Fingerprint Server API: resolve requestId -> authoritative
+            |   visitorId/IP/OS/browser + Smart Signals (overrides client claims)
             | Store Fingerprint (isOriginal=true for first fingerprint)
             | runDetection(): compare new visitorId vs original
             |   -> Mismatch -> computeSimilarity() -> DetectionEvent (PENDING)
@@ -40,7 +42,8 @@ Anthropic Claude · Vercel
 - Node.js 20+
 - A [Neon](https://neon.tech) PostgreSQL database (free tier works)
 - A [Google Cloud Console](https://console.cloud.google.com) project with an OAuth 2.0 client
-- A [FingerprintJS Pro](https://fingerprint.com) account (free trial available)
+- A [FingerprintJS Pro](https://fingerprint.com) account (free trial available) — you need
+  both the Public API Key (browser) and the Secret API Key (server-side verification)
 - An [Anthropic](https://console.anthropic.com) API key
 
 ## Local Setup
@@ -128,12 +131,21 @@ This walkthrough reproduces a session cookie theft and detection end-to-end.
 > `/profile` -> **Fingerprint Mode**. In OSS mode, fingerprints are less stable
 > but the detection pipeline still functions for demo purposes.
 
-> **Threat-model caveat:** Fingerprint components (`visitorId`, OS, browser,
-> etc.) are supplied by the client, so a sophisticated attacker who replays the
-> victim's payload can evade detection. The server sanitizes and length-limits
-> these fields before they reach the Claude prompt, but for production use they
-> should be verified server-side via the FingerprintJS Pro Server API using the
-> collected `requestId`.
+> **Server-side verification:** When `FINGERPRINT_SERVER_API_KEY` is set, the
+> ingest route takes only the `requestId` from the browser and resolves it
+> against Fingerprint's Server API, then uses the server-observed visitor ID,
+> IP, OS, browser, and user agent instead of anything the client claimed about
+> itself. This closes the replay hole — a client that lies about its components
+> is overridden and logged. It also feeds Smart Signals (incognito, VPN, bot,
+> tampering/anti-detect browser, request-ID replay, identification confidence)
+> into the Claude prompt, which is what lets the model separate "incognito on
+> the same laptop" from "cookie replayed from another machine" on evidence
+> rather than inference.
+>
+> Without the key the app still runs, but fingerprint components are
+> client-reported and unverified — fine for the demo, not for production. OSS
+> mode always skips verification, since its `requestId` is a locally generated
+> UUID with nothing to resolve against.
 
 ## Running Tests
 
@@ -142,7 +154,9 @@ npm run test:run
 ```
 
 Tests cover: `computeSimilarity` edge cases, `runDetection` transaction logic (mocked DB),
-and `POST /api/session/record` response shapes (401 auth guard, 400 validation, 200 duplicate).
+`POST /api/session/record` response shapes (401 auth guard, 400 validation, 200 duplicate),
+and `verifyFingerprint` server-API behaviour (override, client-mismatch detection, stale
+events, bot signals, fail-open on lookup errors).
 
 ## Deploying to Vercel
 
@@ -173,6 +187,8 @@ src/
     ├── auth.ts           # Auth.js v5 config (Google provider, database sessions)
     ├── db.ts             # Prisma singleton
     ├── detection.ts      # computeSimilarity() + runDetection()
+    ├── fingerprint-server.ts  # Server API verification + Smart Signals
+    ├── settings.ts       # Shared client/server constants (keys, models, threshold)
     └── claude.ts         # analyzeDetectionEvent() with structured outputs
 prisma/
 └── schema.prisma         # User, Session, Fingerprint, DetectionEvent models

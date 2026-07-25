@@ -1,6 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk"
 import { prisma } from "@/lib/db"
 import { DEFAULT_MODEL, DEFAULT_FLAG_THRESHOLD } from "@/lib/settings"
+import { formatSignals, type FingerprintSignals } from "@/lib/fingerprint-server"
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
@@ -35,6 +36,21 @@ STRONG HIJACK INDICATORS:
 Focus on device characteristics, not visitor ID alone. Weigh the evidence \
 jointly: one weak signal (IP change alone) is benign; multiple independent \
 device-characteristic changes compound quickly.
+
+SERVER-VERIFIED SIGNALS: When a 'SERVER-VERIFIED SIGNALS' block is present, those \
+values came from Fingerprint's server API, not from the browser — they are trustworthy \
+and outrank the fingerprint fields. Use them decisively:
+- Incognito = yes largely explains a changed visitor ID on an otherwise identical device — \
+lower the score substantially.
+- VPN = yes explains an IP and timezone change without implying a different device — \
+discount those two signals and judge on device characteristics alone.
+- Bot detected, tampering/anti-detect browser, or request ID replayed = yes are strong \
+evidence of an attacker actively evading detection — raise the score sharply even if the \
+device characteristics match, since matching characteristics may themselves be forged.
+- Low identification confidence means the visitor ID itself is unreliable — lean on OS, \
+browser, and screen instead.
+If the block is absent, verification was unavailable and the fingerprint fields are \
+client-reported and unverified; be somewhat more cautious about treating a clean match as proof.
 
 CONFIDENCE SCORE CALIBRATION:
 - 0–20: clearly benign — same device characteristics, only visitor ID or IP differs
@@ -98,6 +114,7 @@ export async function analyzeDetectionEvent(
   eventId: string,
   modelOverride?: string,
   flagThreshold: number = DEFAULT_FLAG_THRESHOLD,
+  signals?: FingerprintSignals,
 ): Promise<void> {
   const event = await prisma.detectionEvent.findUnique({
     where: { id: eventId },
@@ -130,6 +147,9 @@ export async function analyzeDetectionEvent(
           (original ? formatFingerprint(original) : `  Visitor ID: ${sanitize(event.originalVisitorId)}\n  IP: ${sanitize(event.originalIp)}`) +
           `\n\nNEW FINGERPRINT (accessing the same session):\n` +
           (newest ? formatFingerprint(newest) : `  Visitor ID: ${sanitize(event.newVisitorId)}\n  IP: ${sanitize(event.newIp)}`) +
+          (signals
+            ? `\n\nSERVER-VERIFIED SIGNALS (from Fingerprint's server API, for the new fingerprint):\n${formatSignals(signals)}`
+            : "") +
           `\n\nComponent similarity score: ${event.similarityScore.toFixed(2)} (0=completely different, 1=identical)\n\n` +
           "Analyze whether this represents a session hijack or a false positive (e.g. incognito browsing, fingerprint drift).",
       },
