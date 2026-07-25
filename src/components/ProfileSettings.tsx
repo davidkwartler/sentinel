@@ -2,24 +2,22 @@
 
 import { useEffect, useState } from "react"
 
-const FP_MODE_KEY = "sentinel_fp_mode"
-const MODEL_KEY = "sentinel_claude_model"
-const FP_CACHE_KEY = "sentinel_fp_sent"
+import {
+  DEFAULT_MODEL,
+  FP_CACHE_KEY,
+  FP_MODE_KEY,
+  MODEL_KEY,
+  MODEL_OPTIONS,
+} from "@/lib/settings"
 
 type FpMode = "pro" | "oss"
-
-const MODEL_OPTIONS = [
-  { value: "claude-haiku-4-5", label: "Haiku 4.5" },
-  { value: "claude-sonnet-5", label: "Sonnet 5" },
-  { value: "claude-opus-5", label: "Opus 5" },
-] as const
 
 const MODEL_PICKER_ENABLED =
   process.env.NEXT_PUBLIC_MODEL_PICKER_ENABLED === "true"
 
 export function ProfileSettings() {
   const [fpMode, setFpMode] = useState<FpMode>("oss")
-  const [model, setModel] = useState("claude-haiku-4-5")
+  const [model, setModel] = useState(DEFAULT_MODEL)
   const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
@@ -30,8 +28,8 @@ export function ProfileSettings() {
     )
     setModel(
       MODEL_PICKER_ENABLED
-        ? localStorage.getItem(MODEL_KEY) || "claude-haiku-4-5"
-        : "claude-haiku-4-5",
+        ? localStorage.getItem(MODEL_KEY) || DEFAULT_MODEL
+        : DEFAULT_MODEL,
     )
     setMounted(true)
   }, [])

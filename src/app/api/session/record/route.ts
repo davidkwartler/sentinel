@@ -4,16 +4,26 @@ import { prisma } from "@/lib/db"
 import { z } from "zod"
 import { runDetection } from "@/lib/detection"
 import { analyzeDetectionEvent } from "@/lib/claude"
+import { ANALYSIS_MODEL_IDS } from "@/lib/settings"
 
+// Length caps double as prompt-injection hardening: these values are
+// interpolated into the Claude analysis prompt, so keep them short and
+// data-shaped. modelOverride is restricted to the known model allowlist so a
+// crafted request can't select an arbitrary (or expensive) model.
 const fingerprintSchema = z.object({
-  visitorId: z.string().min(1),
-  requestId: z.string().min(1),
-  os: z.string().optional(),
-  browser: z.string().optional(),
-  screenRes: z.string().optional(),
-  timezone: z.string().optional(),
-  modelOverride: z.string().optional(),
+  visitorId: z.string().min(1).max(128),
+  requestId: z.string().min(1).max(128),
+  os: z.string().max(64).optional(),
+  browser: z.string().max(64).optional(),
+  screenRes: z.string().max(32).optional(),
+  timezone: z.string().max(64).optional(),
+  modelOverride: z.enum(ANALYSIS_MODEL_IDS).optional(),
 })
+
+// Each mismatched fingerprint triggers a Claude call, so an authenticated
+// script looping on this endpoint is a direct cost lever. Cap ingest per
+// session per hour.
+const MAX_FINGERPRINTS_PER_HOUR = 30
 
 export const maxDuration = 60
 
@@ -56,6 +66,7 @@ export async function POST(request: NextRequest) {
   // isOriginal=true; the loser gets a serialization conflict (P2034) and retries.
   type RecordOutcome =
     | { kind: "duplicate"; id: string }
+    | { kind: "rate_limited" }
     | { kind: "created"; id: string; detected: boolean; eventId?: string }
 
   let outcome: RecordOutcome | undefined
@@ -68,8 +79,19 @@ export async function POST(request: NextRequest) {
           })
           if (existing) return { kind: "duplicate", id: existing.id }
 
+          const recentCount = await tx.fingerprint.count({
+            where: {
+              sessionId: dbSession.id,
+              createdAt: { gt: new Date(Date.now() - 60 * 60 * 1000) },
+            },
+          })
+          if (recentCount >= MAX_FINGERPRINTS_PER_HOUR) {
+            return { kind: "rate_limited" }
+          }
+
           const hasExisting = await tx.fingerprint.findFirst({
             where: { sessionId: dbSession.id },
+            select: { id: true },
           })
 
           const fingerprint = await tx.fingerprint.create({
@@ -113,6 +135,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ status: "duplicate", id: outcome!.id })
   }
 
+  if (outcome!.kind === "rate_limited") {
+    return NextResponse.json({ error: "Too many fingerprints" }, { status: 429 })
+  }
+
   const detectionResult = outcome! as Extract<RecordOutcome, { kind: "created" }>
 
   if (detectionResult.detected && detectionResult.eventId) {
@@ -126,6 +152,8 @@ export async function POST(request: NextRequest) {
           allowModelOverride ? data.modelOverride : undefined,
         )
       } catch (err) {
+        // Fail closed: a broken analysis pipeline must not let a suspicious
+        // session pass silently, so flag it rather than leaving it PENDING.
         console.error("[claude] analyzeDetectionEvent failed for event", eventId, err)
         await prisma.detectionEvent.update({
           where: { id: eventId },

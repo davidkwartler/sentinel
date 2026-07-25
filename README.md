@@ -121,9 +121,18 @@ This walkthrough reproduces a session cookie theft and detection end-to-end.
 6. The dashboard shows the session with a red **FLAGGED** badge
 7. Click the flagged row to expand Claude's reasoning transcript
 
-> **FingerprintJS Pro note:** The app defaults to OSS mode (open-source FingerprintJS).
-> To switch to Pro mode, go to `/profile` and toggle **Fingerprint Mode** to Pro.
-> In OSS mode, fingerprints are less stable but the detection pipeline still functions for demo purposes.
+> **FingerprintJS Pro note:** The app defaults to Pro mode when
+> `NEXT_PUBLIC_FINGERPRINT_API_KEY` is set, and falls back to OSS mode
+> (open-source FingerprintJS) otherwise. You can switch modes at any time from
+> `/profile` -> **Fingerprint Mode**. In OSS mode, fingerprints are less stable
+> but the detection pipeline still functions for demo purposes.
+
+> **Threat-model caveat:** Fingerprint components (`visitorId`, OS, browser,
+> etc.) are supplied by the client, so a sophisticated attacker who replays the
+> victim's payload can evade detection. The server sanitizes and length-limits
+> these fields before they reach the Claude prompt, but for production use they
+> should be verified server-side via the FingerprintJS Pro Server API using the
+> collected `requestId`.
 
 ## Running Tests
 
