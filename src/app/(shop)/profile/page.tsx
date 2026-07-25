@@ -14,11 +14,7 @@ export default async function ProfilePage() {
   const userId = user!.id!
   const currentToken = (await cookies()).get("auth_session")?.value ?? null
 
-  const [account, activeSessions, currentSession, flaggedCount] = await Promise.all([
-    prisma.account.findFirst({
-      where: { userId },
-      select: { provider: true },
-    }),
+  const [activeSessions, currentSession, flaggedCount] = await Promise.all([
     prisma.session.count({ where: { userId, expires: { gt: new Date() } } }),
     currentToken
       ? prisma.session.findUnique({
@@ -30,10 +26,6 @@ export default async function ProfilePage() {
       where: { session: { userId }, status: "FLAGGED" },
     }),
   ])
-
-  const provider = account?.provider
-    ? account.provider[0].toUpperCase() + account.provider.slice(1)
-    : "OAuth"
 
   const verificationOn = isServerVerificationEnabled()
 
@@ -57,9 +49,6 @@ export default async function ProfilePage() {
           </p>
           <p className="truncate text-sm text-gray-600">{user?.email}</p>
         </div>
-        <span className="ml-auto shrink-0 rounded-full border border-gray-200 px-2.5 py-1 text-xs text-gray-600">
-          Signed in with {provider}
-        </span>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">

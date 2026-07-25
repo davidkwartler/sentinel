@@ -29,14 +29,6 @@ export default async function ShopLayout({
             >
               Products
             </Link>
-            {session && (
-              <Link
-                href="/dashboard"
-                className="text-sm text-gray-600 hover:text-gray-900"
-              >
-                Sessions
-              </Link>
-            )}
           </div>
           <div className="flex items-center gap-3 sm:gap-4">
             {session ? (

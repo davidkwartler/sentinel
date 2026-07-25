@@ -64,6 +64,7 @@ export function AccountMenu({
         className="flex items-center gap-2 rounded-full py-1 pl-1 pr-2 transition-colors hover:bg-gray-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-900"
       >
         {avatar}
+        <span className="hidden text-sm text-gray-700 sm:inline">Account</span>
         <svg
           viewBox="0 0 20 20"
           fill="currentColor"
