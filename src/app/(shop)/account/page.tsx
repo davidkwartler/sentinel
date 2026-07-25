@@ -6,7 +6,7 @@ import { prisma } from "@/lib/db"
 import { ProfileSettings } from "@/components/ProfileSettings"
 import { isServerVerificationEnabled } from "@/lib/fingerprint-server"
 
-export default async function ProfilePage() {
+export default async function AccountPage() {
   const session = await auth()
   if (!session) redirect("/login")
 
@@ -30,11 +30,11 @@ export default async function ProfilePage() {
   const verificationOn = isServerVerificationEnabled()
 
   return (
-    <div>
+    <div className="mx-auto max-w-3xl">
       <h1 className="mb-6 text-2xl font-semibold text-gray-900">Account</h1>
 
       {/* Identity. Name and email appear here and nowhere else on the page. */}
-      <div className="mb-6 flex items-center gap-4">
+      <div className="mb-8 flex items-center gap-4">
         {user?.image ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={user.image} alt="" className="h-14 w-14 rounded-full" />
@@ -51,74 +51,48 @@ export default async function ProfilePage() {
         </div>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-2">
-        <div>
-          <p className="mb-3 text-sm font-medium text-gray-500">This session</p>
-          <div className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
-            <dl className="space-y-3 text-sm">
-              <Fact
-                label="Fingerprints recorded"
-                value={currentSession ? String(currentSession._count.fingerprints) : "—"}
-              />
-              <Fact
-                label="Session expires"
-                value={
-                  currentSession ? currentSession.expires.toISOString().slice(0, 10) : "—"
-                }
-              />
-              <Fact
-                label="Active sessions"
-                value={String(activeSessions)}
-                hint={activeSessions > 1 ? "across your devices" : undefined}
-              />
-              <Fact
-                label="Server-side verification"
-                value={verificationOn ? "On" : "Off"}
-                hint={
-                  verificationOn
-                    ? "verified against Fingerprint's API"
-                    : "fingerprints are client-reported"
-                }
-              />
-            </dl>
-            <div className="mt-4 border-t border-gray-100 pt-3">
-              <Link
-                href="/sessions"
-                className="text-sm text-gray-700 underline underline-offset-2 hover:text-gray-900"
-              >
-                {flaggedCount > 0
-                  ? `Review ${flaggedCount} flagged ${flaggedCount === 1 ? "event" : "events"}`
-                  : "View session monitoring"}
-              </Link>
-            </div>
-          </div>
+      <section className="mb-8">
+        <div className="mb-3 flex items-baseline justify-between">
+          <h2 className="text-sm font-medium text-gray-900">This session</h2>
+          <Link
+            href="/sessions"
+            className="text-xs text-gray-600 underline underline-offset-2 hover:text-gray-900"
+          >
+            {flaggedCount > 0
+              ? `Review ${flaggedCount} flagged ${flaggedCount === 1 ? "event" : "events"}`
+              : "View all sessions"}
+          </Link>
         </div>
+        <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <Stat
+            label="Fingerprints"
+            value={currentSession ? String(currentSession._count.fingerprints) : "—"}
+          />
+          <Stat
+            label="Expires"
+            value={currentSession ? currentSession.expires.toISOString().slice(0, 10) : "—"}
+          />
+          <Stat label="Active sessions" value={String(activeSessions)} />
+          <Stat
+            label="Verification"
+            value={verificationOn ? "Server-side" : "Client only"}
+          />
+        </dl>
+      </section>
 
-        <div>
-          <p className="mb-3 text-sm font-medium text-gray-500">Detection settings</p>
-          <ProfileSettings />
-        </div>
-      </div>
+      <section>
+        <h2 className="mb-3 text-sm font-medium text-gray-900">Detection settings</h2>
+        <ProfileSettings />
+      </section>
     </div>
   )
 }
 
-function Fact({
-  label,
-  value,
-  hint,
-}: {
-  label: string
-  value: string
-  hint?: string
-}) {
+function Stat({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex items-baseline justify-between gap-4">
-      <dt className="text-gray-600">{label}</dt>
-      <dd className="text-right">
-        <span className="font-medium text-gray-900">{value}</span>
-        {hint && <span className="ml-2 text-xs text-gray-500">{hint}</span>}
-      </dd>
+    <div className="rounded-lg border border-gray-200 bg-white px-4 py-3 shadow-sm">
+      <dt className="text-xs text-gray-500">{label}</dt>
+      <dd className="mt-1 truncate text-lg font-semibold text-gray-900">{value}</dd>
     </div>
   )
 }
