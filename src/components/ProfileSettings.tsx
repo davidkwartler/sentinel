@@ -89,9 +89,7 @@ export function ProfileSettings() {
       <Row
         label="Analysis model"
         info="Claude reviews every fingerprint mismatch and scores how likely it is to be a hijack rather than the same person on a new browser. Larger models reason more carefully and cost more. Off skips analysis entirely and flags every mismatch."
-        note={
-          MODEL_PICKER_ENABLED ? undefined : "Disabled in this environment."
-        }
+        note={MODEL_PICKER_ENABLED ? undefined : "Model selection locked."}
       >
         <SegmentedControl
           options={MODEL_OPTIONS.map((o) => ({ value: o.value, label: o.label }))}
