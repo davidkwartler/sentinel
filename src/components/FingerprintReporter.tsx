@@ -5,7 +5,7 @@ import {
   FingerprintJSPro,
   type ExtendedGetResult,
 } from "@fingerprintjs/fingerprintjs-pro-spa"
-import { FP_CACHE_KEY, FP_MODE_KEY, MODEL_KEY } from "@/lib/settings"
+import { FP_CACHE_KEY, FP_MODE_KEY, MODEL_KEY, THRESHOLD_KEY } from "@/lib/settings"
 
 function parseUserAgent(ua: string): { os: string; browser: string } {
   let os = "Unknown"
@@ -32,6 +32,7 @@ interface FingerprintPayload {
   screenRes: string
   timezone: string
   modelOverride?: string
+  thresholdOverride?: number
 }
 
 // Loading the Pro SDK is network-bound; memoize the client at module level so
@@ -109,6 +110,11 @@ export function FingerprintReporter() {
     const fpMode = (localStorage.getItem(FP_MODE_KEY) || (process.env.NEXT_PUBLIC_FINGERPRINT_API_KEY ? "pro" : "oss")) as "pro" | "oss"
     setActiveMode(fpMode)
     const modelOverride = localStorage.getItem(MODEL_KEY) || undefined
+    const storedThreshold = Number(localStorage.getItem(THRESHOLD_KEY))
+    const thresholdOverride =
+      Number.isInteger(storedThreshold) && storedThreshold >= 0 && storedThreshold <= 100 && localStorage.getItem(THRESHOLD_KEY) !== null
+        ? storedThreshold
+        : undefined
 
     let cancelled = false
 
@@ -141,7 +147,7 @@ export function FingerprintReporter() {
         }
         if (cancelled) return
 
-        await submit(payload)
+        await submit({ ...payload, thresholdOverride })
       } catch (err) {
         console.error("[Sentinel] Fingerprint capture failed:", err)
         if (!cancelled) setVisible(false)

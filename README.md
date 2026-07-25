@@ -26,8 +26,9 @@ Browser (Device A)
             |   -> Mismatch -> computeSimilarity() -> DetectionEvent (PENDING)
             |                -> after() -> analyzeDetectionEvent() [async]
             |                              +-> Claude API -> {confidenceScore, reasoning}
-            |                                  confidenceScore >= 70 -> FLAGGED
-            |                                  confidenceScore <  70 -> CLEAR
+            |                                  confidenceScore >= threshold (default 70) -> FLAGGED
+            |                                  confidenceScore <  threshold -> CLEAR
+            |                                  (analysis "Off" -> flag on mismatch alone)
             +-> /dashboard (polls 8s) -> SessionTable -> FLAGGED badge -> expandable reasoning
 ```
 

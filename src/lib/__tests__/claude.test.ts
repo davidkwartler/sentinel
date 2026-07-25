@@ -207,6 +207,37 @@ describe('analyzeDetectionEvent', () => {
     )
   })
 
+  it('respects a custom flag threshold', async () => {
+    prismaMock.detectionEvent.findUnique.mockResolvedValue({
+      id: 'event-5',
+      createdAt: new Date(),
+      sessionId: 'sess-1',
+      originalVisitorId: 'fp-original',
+      newVisitorId: 'fp-new',
+      originalIp: null,
+      newIp: null,
+      similarityScore: 0.5,
+      status: 'PENDING',
+      confidenceScore: null,
+      reasoning: null,
+      session: { id: 'sess-1', fingerprints: [] },
+    } as any)
+
+    mockCreate.mockResolvedValue({
+      content: [{ type: 'text', text: JSON.stringify({ confidenceScore: 50, reasoning: 'test' }) }],
+    })
+    prismaMock.detectionEvent.update.mockResolvedValue({} as any)
+
+    // 50 is below the default 70 threshold, but at a stricter threshold of 40
+    // the same score should flag
+    await analyzeDetectionEvent('event-5', undefined, 40)
+
+    expect(prismaMock.detectionEvent.update).toHaveBeenCalledWith({
+      where: { id: 'event-5' },
+      data: expect.objectContaining({ status: 'FLAGGED' }),
+    })
+  })
+
   it('throws when Claude returns unexpected content type', async () => {
     prismaMock.detectionEvent.findUnique.mockResolvedValue({
       id: 'event-4',
