@@ -21,12 +21,12 @@ export function SiteHeader({
         <div className="flex items-center gap-3 sm:gap-6">
           <Link
             href="/products"
-            className="flex items-center gap-2 text-lg font-semibold leading-none tracking-tight text-gray-900"
+            className="flex items-center gap-2.5 text-xl font-bold leading-none tracking-tight text-gray-900"
           >
             {/* leading-none on the lockup: with default leading, items-center
                 aligns the mark to the line box including descender space, and
                 "Sentinel" has no descenders — so the mark reads low. */}
-            <ShieldIcon className="h-6 w-6" outlined />
+            <ShieldIcon className="h-8 w-8" outlined />
             <span className="hidden sm:inline">Sentinel</span>
           </Link>
           {/* Styled as a button rather than a bare link so it reads as an
