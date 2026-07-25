@@ -2,20 +2,6 @@
 
 ## Next
 
-### Inconsistent page width between sessions and account
-
-The session monitoring page is wider than the account page, so the content
-shifts when moving between them.
-
-Cause: the shop layout wraps `<main>` in `max-w-5xl`, which `/sessions` uses
-as-is, while `/account` adds its own `max-w-3xl` container (added during the
-account redesign to keep the settings rows from stretching).
-
-Decide which width wins. `max-w-3xl` suits the account page's label/control
-rows; the sessions page benefits from the extra width for the side-by-side
-fingerprint comparison. If they should match, the fingerprint comparison grid
-is the thing to check at the narrower width.
-
 ### New README screenshots
 
 The two screenshots at the top of the README predate the July 2026 UI work and
@@ -39,13 +25,15 @@ Worth capturing while running the hijack walkthrough end to end, since that
 produces a genuine FLAGGED row with real Claude reasoning — one shot of a
 detected hijack and one of a false positive, matching the current alt text.
 
-## Ideas
+## Done
 
-- Point the account page's "Verification" stat at `/api/fingerprint/health`
-  instead of a bare key-exists check, so it can't report "Server-side" while
-  every lookup is failing. Needs light caching.
-- Redirects from `/dashboard` and `/profile` to the renamed routes, if the old
-  URLs were ever shared.
-- Per-user server-side detection settings. Threshold, model, and fingerprint
-  mode currently live in localStorage, so they are per-browser rather than
-  per-account.
+- Unified page width — `/account` now uses the layout's `max-w-5xl` like
+  `/sessions`, rather than its own narrower container.
+- The account page's "Verification" stat now reflects a live probe of the
+  Fingerprint Server API rather than the presence of a key.
+
+## Not doing
+
+- Redirects from `/dashboard` and `/profile` — the old URLs were never shared.
+- Per-user server-side detection settings. Per-browser via localStorage is
+  fine for a demo, and it avoids a schema change.

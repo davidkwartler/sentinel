@@ -39,9 +39,9 @@ export interface FingerprintSignals {
 // should be treated as a possible replay rather than a live page load.
 const MAX_EVENT_AGE_MS = 2 * 60 * 1000
 
-export function isServerVerificationEnabled(): boolean {
-  return Boolean(process.env.FINGERPRINT_SERVER_API_KEY)
-}
+// Deliberately no isVerificationEnabled() helper: a key being present says
+// nothing about whether lookups succeed. Anything reporting verification state
+// should use checkServerApiHealth, which actually probes the API.
 
 /** Plain-English meaning of Fingerprint's API error codes. */
 export function describeErrorCode(code: string): string {
@@ -66,6 +66,22 @@ export function describeErrorCode(code: string): string {
 }
 
 export type HealthStatus = "ok" | "not_configured" | "error"
+
+// Config changes require a redeploy, so a stale-by-a-minute answer is fine and
+// keeps the account page from making an API call on every load. Per-instance,
+// which is all a serverless runtime can offer here.
+const HEALTH_TTL_MS = 60_000
+let healthCache: { at: number; result: HealthResult } | null = null
+
+/** checkServerApiHealth with a short TTL, for anything on a render path. */
+export async function getCachedServerApiHealth(): Promise<HealthResult> {
+  if (healthCache && Date.now() - healthCache.at < HEALTH_TTL_MS) {
+    return healthCache.result
+  }
+  const result = await checkServerApiHealth()
+  healthCache = { at: Date.now(), result }
+  return result
+}
 
 export interface HealthResult {
   status: HealthStatus
