@@ -144,7 +144,10 @@ export function SessionTable({
                 </div>
               </div>
 
-              <div className="flex shrink-0 items-center gap-2">
+              {/* Not shrink-0: at phone widths the meter plus both buttons is
+                  wider than the row, and an unshrinkable group overflowed the
+                  card instead of wrapping. */}
+              <div className="flex flex-wrap items-center gap-2">
                 {event?.confidenceScore != null && (
                   <ConfidenceMeter
                     score={event.confidenceScore}
