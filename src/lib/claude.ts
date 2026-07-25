@@ -49,7 +49,10 @@ evidence of an attacker actively evading detection — raise the score sharply e
 device characteristics match, since matching characteristics may themselves be forged.
 - Low identification confidence means the visitor ID itself is unreliable — lean on OS, \
 browser, and screen instead.
-If the block is absent, verification was unavailable and the fingerprint fields are \
+Only signals available on the current Fingerprint plan are listed. A signal that does not \
+appear was not measured — treat it as unknown, and do NOT read its absence as evidence \
+either way. Judge on the signals present plus the device characteristics.
+If the whole block is absent, verification was unavailable and the fingerprint fields are \
 client-reported and unverified; be somewhat more cautious about treating a clean match as proof.
 
 CONFIDENCE SCORE CALIBRATION:

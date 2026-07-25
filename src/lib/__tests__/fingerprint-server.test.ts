@@ -210,7 +210,7 @@ describe('describeErrorCode', () => {
 })
 
 describe('formatSignals', () => {
-  it('renders unknown for null signals', () => {
+  it('omits signals the plan did not provide', () => {
     const out = formatSignals({
       incognito: null,
       vpn: null,
@@ -221,7 +221,28 @@ describe('formatSignals', () => {
       stale: false,
     })
 
-    expect(out).toContain('Incognito/private browsing: unknown')
-    expect(out).toContain('Identification confidence: unknown')
+    expect(out).not.toContain('Incognito')
+    expect(out).not.toContain('VPN')
+    expect(out).not.toContain('confidence')
+    // Staleness is derived locally, so it is always reported
+    expect(out).toContain('replay window: no')
+  })
+
+  it('includes only the signals that are present', () => {
+    const out = formatSignals({
+      incognito: true,
+      vpn: null,
+      bot: false,
+      tampered: null,
+      replayed: null,
+      confidence: 0.97,
+      stale: false,
+    })
+
+    expect(out).toContain('Incognito/private browsing: yes')
+    expect(out).toContain('Bot detected: no')
+    expect(out).toContain('Identification confidence: 0.97')
+    expect(out).not.toContain('VPN')
+    expect(out).not.toContain('tampering')
   })
 })
