@@ -2,25 +2,11 @@
 
 import Link from "next/link"
 import { useEffect, useRef, useState } from "react"
+import { SessionsIcon, SignOutIcon, UserIcon } from "@/components/icons"
 
-// Shared frame for the menu-item glyphs so all three stay the same size,
-// weight, and color. Children are the paths for the individual icon.
-function MenuIcon({ children }: { children: React.ReactNode }) {
-  return (
-    <svg
-      viewBox="0 0 20 20"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={1.5}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-      className="h-4 w-4 shrink-0 text-gray-500"
-    >
-      {children}
-    </svg>
-  )
-}
+// One size and color for every menu glyph; the shapes come from the shared
+// icon set so a destination looks the same here, in the footer, and in the nav.
+const MENU_ICON = "h-4 w-4 text-gray-500"
 
 // Sign out is destructive and irreversible in one click, so it lives inside
 // this menu rather than sitting in the nav at the same weight as navigation
@@ -120,10 +106,7 @@ export function AccountMenu({
               onClick={() => setOpen(false)}
               className="flex items-center gap-2 px-3 py-2 text-sm text-gray-900 hover:bg-gray-50"
             >
-              <MenuIcon>
-                <circle cx="10" cy="7" r="3" />
-                <path d="M4.5 16.25a5.5 5.5 0 0 1 11 0" />
-              </MenuIcon>
+              <UserIcon className={MENU_ICON} />
               Account settings
             </Link>
             <Link
@@ -132,11 +115,7 @@ export function AccountMenu({
               onClick={() => setOpen(false)}
               className="flex items-center gap-2 px-3 py-2 text-sm text-gray-900 hover:bg-gray-50"
             >
-              <MenuIcon>
-                <rect x="2.75" y="4.25" width="14.5" height="10" rx="1.5" />
-                <path d="M7 16.75h6" />
-                <path d="M10 14.25v2.5" />
-              </MenuIcon>
+              <SessionsIcon className={MENU_ICON} />
               Session monitoring
             </Link>
           </div>
@@ -147,10 +126,7 @@ export function AccountMenu({
               role="menuitem"
               className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 hover:text-gray-900"
             >
-              <MenuIcon>
-                <path d="M12.5 6.5V4.75A1.25 1.25 0 0 0 11.25 3.5h-5A1.25 1.25 0 0 0 5 4.75v10.5a1.25 1.25 0 0 0 1.25 1.25h5a1.25 1.25 0 0 0 1.25-1.25V13.5" />
-                <path d="M9 10h8m0 0-2.5-2.5M17 10l-2.5 2.5" />
-              </MenuIcon>
+              <SignOutIcon className={MENU_ICON} />
               Sign out
             </button>
           </form>
