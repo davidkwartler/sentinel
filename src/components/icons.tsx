@@ -25,20 +25,40 @@ function Stroke({
   )
 }
 
-// The Sentinel mark: Ionicons filled shield (MIT, ionic-team/ionicons) in
-// brand violet. Filled rather than outlined so it survives favicon size, and
-// violet because red/amber/green/orange all carry status meaning elsewhere.
+// The Sentinel mark: Remix Icon's faceted shield (Apache 2.0,
+// Remix-Design/RemixIcon) in brand violet. Violet because red, amber, green,
+// and orange all carry status meaning elsewhere in the app.
 export const BRAND_VIOLET = "#7C3AED"
+export const BRAND_VIOLET_DARK = "#4C1D95"
 
-export function ShieldIcon({ className = "h-5 w-5" }: { className?: string }) {
+const SHIELD_PATH =
+  "M3.78307 2.82598L12 1L20.2169 2.82598C20.6745 2.92766 21 3.33347 21 3.80217V13.7889C21 15.795 19.9974 17.6684 18.3282 18.7812L12 23L5.6718 18.7812C4.00261 17.6684 3 15.795 3 13.7889V3.80217C3 3.33347 3.32553 2.92766 3.78307 2.82598Z"
+
+/**
+ * `outlined` adds the darker keyline used at header sizes. Leave it off below
+ * roughly 20px — the stroke eats too much of the shape and the mark reads
+ * muddy rather than violet.
+ */
+export function ShieldIcon({
+  className = "h-5 w-5",
+  outlined = false,
+}: {
+  className?: string
+  outlined?: boolean
+}) {
   return (
     <svg
-      viewBox="0 0 512 512"
-      fill="currentColor"
+      viewBox="0 0 24 24"
+      fill={BRAND_VIOLET}
       aria-hidden="true"
       className={`shrink-0 ${className}`}
     >
-      <path d="M479.07,111.35A16,16,0,0,0,465.92,96.6C379.89,81.18,343.69,69.12,266,34.16c-7.76-2.89-12.57-2.84-20,0-77.69,35-113.89,47-199.92,62.44a16,16,0,0,0-13.15,14.75c-3.85,61.1,4.34,118,24.36,169.15a348.86,348.86,0,0,0,71.43,112.41c44.67,47.43,94.2,75.12,119.74,85.6a20,20,0,0,0,15.11,0c27-10.92,74.69-37.82,119.71-85.62A348.86,348.86,0,0,0,454.71,280.5C474.73,229.36,482.92,172.45,479.07,111.35Z" />
+      <path
+        d={SHIELD_PATH}
+        stroke={outlined ? BRAND_VIOLET_DARK : undefined}
+        strokeWidth={outlined ? 1.2 : undefined}
+        strokeLinejoin="round"
+      />
     </svg>
   )
 }
