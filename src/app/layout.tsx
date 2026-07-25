@@ -22,7 +22,7 @@ export default function RootLayout({
       {/* Column layout so the footer sits at the bottom of short pages
           instead of floating mid-viewport. */}
       <body className={`${geist.className} flex min-h-screen flex-col antialiased`}>
-        <div className="flex-1">{children}</div>
+        <div className="flex flex-1 flex-col">{children}</div>
         <Footer />
         <Analytics />
         <SpeedInsights />

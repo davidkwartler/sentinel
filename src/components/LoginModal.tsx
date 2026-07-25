@@ -31,8 +31,8 @@ export function LoginModal({ signInAction }: { signInAction: () => void }) {
         >
           ✕
         </button>
-        <h1 className="mb-2 flex items-center justify-center gap-2 text-center text-2xl font-semibold text-gray-900">
-          <ShieldIcon className="h-6 w-6 text-[#7C3AED]" />
+        <h1 className="mb-2 flex items-center justify-center gap-2.5 text-center text-2xl font-semibold leading-none text-gray-900">
+          <ShieldIcon className="h-8 w-8 text-[#7C3AED]" />
           Sentinel
         </h1>
         <p className="mb-8 text-center text-sm text-gray-500">
