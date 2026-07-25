@@ -167,7 +167,7 @@ function SegmentedControl({
 }) {
   return (
     <div
-      className={`inline-flex rounded-md border border-gray-200 bg-gray-50 p-0.5 ${
+      className={`inline-flex rounded-md border border-gray-300 bg-gray-100 p-0.5 ${
         disabled ? "opacity-60" : ""
       }`}
     >
@@ -179,10 +179,10 @@ function SegmentedControl({
             onClick={() => !disabled && onChange(opt.value)}
             disabled={disabled}
             aria-pressed={selected}
-            className={`rounded px-3 py-1.5 text-sm font-medium transition-colors ${
+            className={`rounded px-3 py-1.5 text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-900 focus-visible:ring-offset-1 ${
               selected
-                ? "bg-white text-gray-900 shadow-sm"
-                : "text-gray-600 hover:text-gray-900"
+                ? "bg-gray-900 text-white shadow-sm"
+                : "text-gray-700 hover:bg-gray-200 hover:text-gray-900"
             } ${disabled ? "cursor-not-allowed" : ""}`}
           >
             {opt.label}
