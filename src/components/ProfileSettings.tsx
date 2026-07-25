@@ -178,8 +178,14 @@ function SegmentedControl({
             disabled={disabled}
             aria-pressed={selected}
             className={`rounded px-2 py-1.5 text-xs font-medium transition-colors sm:px-3 sm:text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-600 focus-visible:ring-offset-1 ${
+              // Violet means interactive, so a locked control shouldn't wear
+              // it — a violet fill at 60% opacity still read as "this is
+              // selectable and selected". Grey says "this is the value, and
+              // you can't change it".
               selected
-                ? "bg-violet-600 text-white shadow-sm"
+                ? disabled
+                  ? "bg-gray-500 text-white shadow-sm"
+                  : "bg-violet-600 text-white shadow-sm"
                 : "text-gray-700 hover:bg-gray-200 hover:text-gray-900"
             } ${disabled ? "cursor-not-allowed" : ""}`}
           >
