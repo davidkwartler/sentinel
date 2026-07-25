@@ -146,6 +146,18 @@ This walkthrough reproduces a session cookie theft and detection end-to-end.
 > client-reported and unverified — fine for the demo, not for production. OSS
 > mode always skips verification, since its `requestId` is a locally generated
 > UUID with nothing to resolve against.
+>
+> **Plan tiers:** Identification (the authoritative visitorId, IP, OS, and
+> browser) is available on every plan, so the replay protection above works
+> regardless. Smart Signals are plan-gated — signals your plan doesn't include
+> simply aren't sent to Claude, and the prompt instructs the model to treat a
+> missing signal as unmeasured rather than as a negative result.
+>
+> To check verification in a running deployment, sign in and request
+> `GET /api/fingerprint/health`. It probes the Server API and reports `ok`,
+> `not_configured`, or an error code translated into plain English
+> (`TokenNotFound`, `WrongRegion`, `SubscriptionNotActive`, …). It never
+> returns the key.
 
 ## Running Tests
 

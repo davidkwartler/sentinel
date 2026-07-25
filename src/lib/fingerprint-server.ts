@@ -195,16 +195,33 @@ export async function verifyFingerprint(
   }
 }
 
-/** Render signals for the Claude prompt. Server-observed, so safe to inline. */
+/**
+ * Render signals for the Claude prompt. Server-observed, so safe to inline.
+ *
+ * Smart Signals are plan-gated — on lower tiers most arrive as null. Emit only
+ * the ones actually present rather than a wall of "unknown", which would spend
+ * tokens telling the model nothing and invites hedging on absent evidence.
+ * The staleness line is always present — it comes from the event timestamp, not
+ * from a paid signal — so there is always at least one line to report.
+ */
 export function formatSignals(signals: FingerprintSignals): string {
-  const yesNo = (v: boolean | null) => (v === null ? "unknown" : v ? "yes" : "no")
-  return [
-    `  Incognito/private browsing: ${yesNo(signals.incognito)}`,
-    `  VPN detected: ${yesNo(signals.vpn)}`,
-    `  Bot detected: ${yesNo(signals.bot)}`,
-    `  Browser tampering / anti-detect browser: ${yesNo(signals.tampered)}`,
-    `  Request ID replayed: ${yesNo(signals.replayed)}`,
-    `  Identification confidence: ${signals.confidence ?? "unknown"}`,
+  const lines: string[] = []
+  const add = (label: string, value: boolean | null) => {
+    if (value !== null) lines.push(`  ${label}: ${value ? "yes" : "no"}`)
+  }
+
+  add("Incognito/private browsing", signals.incognito)
+  add("VPN detected", signals.vpn)
+  add("Bot detected", signals.bot)
+  add("Browser tampering / anti-detect browser", signals.tampered)
+  add("Request ID replayed", signals.replayed)
+  if (signals.confidence !== null) {
+    lines.push(`  Identification confidence: ${signals.confidence}`)
+  }
+  // Always meaningful: derived from the event timestamp, not a paid signal.
+  lines.push(
     `  Event older than the 2-minute replay window: ${signals.stale ? "yes" : "no"}`,
-  ].join("\n")
+  )
+
+  return lines.join("\n")
 }
