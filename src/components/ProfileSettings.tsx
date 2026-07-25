@@ -118,7 +118,7 @@ export function ProfileSettings() {
             disabled={analysisOff}
             onChange={(e) => handleThresholdChange(Number(e.target.value))}
             aria-label="Flag threshold"
-            className="w-40 accent-gray-900 sm:w-48"
+            className="w-40 accent-violet-600 sm:w-48"
           />
           <span className="w-7 text-right text-sm font-medium tabular-nums text-gray-900">
             {threshold}
@@ -177,9 +177,9 @@ function SegmentedControl({
             onClick={() => !disabled && onChange(opt.value)}
             disabled={disabled}
             aria-pressed={selected}
-            className={`rounded px-2 py-1.5 text-xs font-medium transition-colors sm:px-3 sm:text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-900 focus-visible:ring-offset-1 ${
+            className={`rounded px-2 py-1.5 text-xs font-medium transition-colors sm:px-3 sm:text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-600 focus-visible:ring-offset-1 ${
               selected
-                ? "bg-gray-900 text-white shadow-sm"
+                ? "bg-violet-600 text-white shadow-sm"
                 : "text-gray-700 hover:bg-gray-200 hover:text-gray-900"
             } ${disabled ? "cursor-not-allowed" : ""}`}
           >

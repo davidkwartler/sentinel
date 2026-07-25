@@ -39,7 +39,7 @@ export function InfoTip({ label, children }: { label: string; children: React.Re
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
         aria-label={`About ${label}`}
-        className="flex h-4 w-4 items-center justify-center rounded-full border border-gray-300 text-[10px] font-semibold text-gray-500 transition-colors hover:border-gray-400 hover:text-gray-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-900"
+        className="flex h-4 w-4 items-center justify-center rounded-full border border-gray-300 text-[10px] font-semibold text-gray-500 transition-colors hover:border-gray-400 hover:text-gray-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-600"
       >
         i
       </button>
