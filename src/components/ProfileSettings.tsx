@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react"
 
+import { InfoTip } from "@/components/InfoTip"
 import {
   ANALYSIS_OFF,
   clampThreshold,
@@ -67,85 +68,45 @@ export function ProfileSettings() {
 
   if (!mounted) return null
 
+  const analysisOff = model === ANALYSIS_OFF
+
   return (
-    <div className="space-y-4">
-      {/* Fingerprint Mode */}
-      <div className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
-        <p className="mb-1 text-sm font-medium text-gray-900">
-          Device Fingerprinting
-        </p>
-        <p className="mb-3 text-xs text-gray-500">
-          Identifies unique devices accessing the product page, so we can
-          detect suspicious session activity.
-        </p>
-        <div className="flex gap-2">
-          {(["oss", "pro"] as const).map((mode) => (
-            <button
-              key={mode}
-              onClick={() => handleFpModeChange(mode)}
-              aria-pressed={fpMode === mode}
-              className={`rounded-md px-4 py-2 text-sm font-medium transition-colors ${
-                fpMode === mode
-                  ? "bg-gray-900 text-white"
-                  : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-              }`}
-            >
-              {mode === "pro" ? "Pro" : "Open Source"}
-            </button>
-          ))}
-        </div>
-        <p className="mt-2 text-[11px] italic text-gray-400">
-          Defaults to FingerprintJS Pro when an API key is configured for
-          improved accuracy; falls back to open source otherwise.
-        </p>
-      </div>
+    <div className="divide-y divide-gray-100 rounded-lg border border-gray-200 bg-white shadow-sm">
+      <Row
+        label="Fingerprint source"
+        info="How each device is identified. Pro uses FingerprintJS Pro for higher accuracy and lets the server verify what the browser reports. Open source uses the free agent, which is less stable across sessions. Defaults to Pro when an API key is configured."
+      >
+        <SegmentedControl
+          options={[
+            { value: "oss", label: "Open source" },
+            { value: "pro", label: "Pro" },
+          ]}
+          value={fpMode}
+          onChange={(v) => handleFpModeChange(v as FpMode)}
+        />
+      </Row>
 
-      {/* Claude Model */}
-      <div className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
-        <p className="mb-1 text-sm font-medium text-gray-900">GenAI Analysis</p>
-        <p className="mb-3 text-xs text-gray-500">
-          Reviews fingerprint mismatches and determines if a session hijack
-          has occurred.
-        </p>
-        <div className="flex gap-2">
-          {MODEL_OPTIONS.map((opt) => (
-            <button
-              key={opt.value}
-              onClick={() => MODEL_PICKER_ENABLED && handleModelChange(opt.value)}
-              disabled={!MODEL_PICKER_ENABLED}
-              aria-pressed={model === opt.value}
-              className={`rounded-md px-4 py-2 text-sm font-medium transition-colors ${
-                MODEL_PICKER_ENABLED
-                  ? model === opt.value
-                    ? "bg-gray-900 text-white"
-                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                  : model === opt.value
-                    ? "cursor-not-allowed bg-gray-200 text-gray-400"
-                    : "cursor-not-allowed bg-gray-50 text-gray-300"
-              }`}
-            >
-              {opt.label}
-            </button>
-          ))}
-        </div>
-        <p className="mt-2 text-[11px] italic text-gray-400">
-          Claude Haiku by default, use Opus for best results. Off skips GenAI
-          analysis and flags on fingerprint mismatch alone.
-          {!MODEL_PICKER_ENABLED && " Model selection is disabled in this environment."}
-        </p>
+      <Row
+        label="Analysis model"
+        info="Claude reviews every fingerprint mismatch and scores how likely it is to be a hijack rather than the same person on a new browser. Larger models reason more carefully and cost more. Off skips analysis entirely and flags every mismatch."
+        note={
+          MODEL_PICKER_ENABLED ? undefined : "Disabled in this environment."
+        }
+      >
+        <SegmentedControl
+          options={MODEL_OPTIONS.map((o) => ({ value: o.value, label: o.label }))}
+          value={model}
+          onChange={handleModelChange}
+          disabled={!MODEL_PICKER_ENABLED}
+        />
+      </Row>
 
-        {/* Flag Threshold */}
-        <div className={`mt-4 border-t border-gray-100 pt-4 ${model === ANALYSIS_OFF ? "opacity-50" : ""}`}>
-          <div className="mb-1 flex items-center justify-between">
-            <p className="text-sm font-medium text-gray-900">Flag Threshold</p>
-            <span className="rounded bg-gray-100 px-2 py-0.5 text-xs font-semibold text-gray-700">
-              {threshold}
-            </span>
-          </div>
-          <p className="mb-3 text-xs text-gray-500">
-            Detection events with a confidence score at or above this value are
-            flagged.
-          </p>
+      <Row
+        label="Flag threshold"
+        info={`Sessions scoring at or above this are flagged. Lower catches more hijacks and more false alarms. Default ${DEFAULT_FLAG_THRESHOLD}, minimum ${MIN_FLAG_THRESHOLD}.`}
+        note={analysisOff ? "Unused while analysis is off." : undefined}
+      >
+        <div className={`flex items-center gap-3 ${analysisOff ? "opacity-50" : ""}`}>
           {/* Track spans the full 0–100 so the thumb sits where the number
               actually falls; handleThresholdChange clamps a drag below the
               floor back up to it. Setting min={MIN_FLAG_THRESHOLD} would park
@@ -156,18 +117,78 @@ export function ProfileSettings() {
             max={MAX_FLAG_THRESHOLD}
             step={5}
             value={threshold}
-            disabled={model === ANALYSIS_OFF}
+            disabled={analysisOff}
             onChange={(e) => handleThresholdChange(Number(e.target.value))}
             aria-label="Flag threshold"
-            className="w-full accent-gray-900"
+            className="w-40 accent-gray-900 sm:w-48"
           />
-          <p className="mt-2 text-[11px] italic text-gray-400">
-            Defaults to {DEFAULT_FLAG_THRESHOLD}, minimum {MIN_FLAG_THRESHOLD}.
-            Adjust based on security posture.
-            {model === ANALYSIS_OFF && " Not used while GenAI analysis is off."}
-          </p>
+          <span className="w-7 text-right text-sm font-medium tabular-nums text-gray-900">
+            {threshold}
+          </span>
         </div>
+      </Row>
+    </div>
+  )
+}
+
+function Row({
+  label,
+  info,
+  note,
+  children,
+}: {
+  label: string
+  info: string
+  note?: string
+  children: React.ReactNode
+}) {
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-4">
+      <div className="flex items-center gap-1.5">
+        <span className="text-sm font-medium text-gray-900">{label}</span>
+        <InfoTip label={label}>{info}</InfoTip>
+        {note && <span className="ml-1 text-xs text-gray-500">{note}</span>}
       </div>
+      {children}
+    </div>
+  )
+}
+
+function SegmentedControl({
+  options,
+  value,
+  onChange,
+  disabled,
+}: {
+  options: { value: string; label: string }[]
+  value: string
+  onChange: (value: string) => void
+  disabled?: boolean
+}) {
+  return (
+    <div
+      className={`inline-flex rounded-md border border-gray-200 bg-gray-50 p-0.5 ${
+        disabled ? "opacity-60" : ""
+      }`}
+    >
+      {options.map((opt) => {
+        const selected = value === opt.value
+        return (
+          <button
+            key={opt.value}
+            onClick={() => !disabled && onChange(opt.value)}
+            disabled={disabled}
+            aria-pressed={selected}
+            className={`rounded px-3 py-1.5 text-sm font-medium transition-colors ${
+              selected
+                ? "bg-white text-gray-900 shadow-sm"
+                : "text-gray-600 hover:text-gray-900"
+            } ${disabled ? "cursor-not-allowed" : ""}`}
+          >
+            {opt.label}
+          </button>
+        )
+      })}
     </div>
   )
 }

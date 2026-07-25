@@ -32,11 +32,12 @@ export function clampThreshold(value: number): number {
   return Math.min(MAX_FLAG_THRESHOLD, Math.max(MIN_FLAG_THRESHOLD, Math.round(value)))
 }
 
+// Ordered as a power ramp: Off is the zero end, then increasing capability.
 export const MODEL_OPTIONS = [
+  { value: ANALYSIS_OFF, label: "Off" },
   { value: "claude-haiku-4-5", label: "Haiku 4.5" },
   { value: "claude-sonnet-5", label: "Sonnet 5" },
   { value: "claude-opus-5", label: "Opus 5" },
-  { value: ANALYSIS_OFF, label: "Off" },
 ] as const
 
 // Server-side allowlist for the client-supplied modelOverride — prevents a
