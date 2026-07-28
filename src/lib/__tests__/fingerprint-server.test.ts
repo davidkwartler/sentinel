@@ -27,6 +27,9 @@ import {
   resolveFingerprint,
   formatSignals,
   formatDerivedSignals,
+  formatLocation,
+  formatNetwork,
+  ipDistanceKm,
   checkServerApiHealth,
   getCachedServerApiHealth,
   describeErrorCode,
@@ -145,6 +148,142 @@ describe('verifyFingerprint', () => {
     const result = await verifyFingerprint('req-1', { visitorId: 'client' })
 
     expect(result).toBeNull()
+  })
+})
+
+describe('verifyFingerprint enrichment', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    process.env.FINGERPRINT_SERVER_API_KEY = 'secret'
+  })
+
+  afterEach(() => {
+    delete process.env.FINGERPRINT_SERVER_API_KEY
+  })
+
+  // Shaped after a real Server API response. The paths here are the whole point
+  // of the test: the dashboard/webhook payload is flat snake_case, the Server
+  // API is nested camelCase under `products`, and reading one while coding
+  // against the other fails silently by producing nulls everywhere.
+  function enrichedFixture() {
+    const base = eventFixture()
+    return {
+      products: {
+        ...base.products,
+        identification: {
+          data: {
+            ...base.products.identification.data,
+            visitorFound: false,
+            firstSeenAt: { global: null, subscription: '2026-07-28T09:25:13.000Z' },
+            lastSeenAt: { global: null, subscription: '2026-07-28T09:25:13.000Z' },
+            browserDetails: {
+              ...base.products.identification.data.browserDetails,
+              osVersion: '10.15.7',
+              browserFullVersion: '150.0.0',
+              device: 'Other',
+            },
+          },
+        },
+        ipInfo: {
+          data: {
+            v4: {
+              address: '136.49.184.216',
+              geolocation: {
+                accuracyRadius: 20,
+                latitude: 30.26715,
+                longitude: -97.74306,
+                timezone: 'America/Chicago',
+                city: { name: 'Austin' },
+                country: { name: 'United States', code: 'US' },
+                subdivisions: [{ isoCode: 'TX', name: 'Texas' }],
+              },
+              asn: { asn: '16591', name: 'Google Fiber Inc.', network: '136.32.0.0/11', type: 'isp' },
+              datacenter: { result: false, name: '' },
+            },
+          },
+        },
+        velocity: {
+          data: {
+            distinctIp: { intervals: { '5m': 1, '1h': 1, '24h': 2 } },
+            distinctCountry: { intervals: { '5m': 1, '1h': 1, '24h': 1 } },
+          },
+        },
+        suspectScore: { data: { result: 0 } },
+        ipBlocklist: { data: { result: false, details: { emailSpam: false, attackSource: false } } },
+        proxy: { data: { result: false, confidence: 'high' } },
+        vpn: { data: { result: false, confidence: 'high', methods: { timezoneMismatch: false } } },
+        tampering: { data: { result: false, confidence: 'high', mlScore: 0.0263, anomalyScore: 0, antiDetectBrowser: false } },
+        highActivity: { data: { result: false } },
+      },
+    }
+  }
+
+  it('maps geolocation, ASN and datacenter off the v4 block', async () => {
+    mockGetEvent.mockResolvedValue(enrichedFixture())
+
+    const result = await verifyFingerprint('pro-request-id', { visitorId: 'server-visitor' })
+
+    expect(result?.details.ipCity).toBe('Austin')
+    expect(result?.details.ipSubdivision).toBe('Texas')
+    expect(result?.details.ipCountry).toBe('United States')
+    expect(result?.details.ipAccuracyRadius).toBe(20)
+    expect(result?.details.ipTimezone).toBe('America/Chicago')
+    expect(result?.details.asnName).toBe('Google Fiber Inc.')
+    expect(result?.details.asnType).toBe('isp')
+    expect(result?.signals.datacenter).toBe(false)
+  })
+
+  it('maps device detail and visitor history', async () => {
+    mockGetEvent.mockResolvedValue(enrichedFixture())
+
+    const result = await verifyFingerprint('pro-request-id', { visitorId: 'server-visitor' })
+
+    expect(result?.details.osVersion).toBe('10.15.7')
+    expect(result?.details.browserVersion).toBe('150.0.0')
+    expect(result?.signals.visitorFound).toBe(false)
+    expect(result?.details.firstSeenAt).toBeInstanceOf(Date)
+  })
+
+  it('keeps ML scores and velocity intervals', async () => {
+    mockGetEvent.mockResolvedValue(enrichedFixture())
+
+    const result = await verifyFingerprint('pro-request-id', { visitorId: 'server-visitor' })
+
+    expect(result?.signals.tamperingDetail?.mlScore).toBe(0.0263)
+    expect(result?.signals.tamperingDetail?.confidence).toBe('high')
+    expect(result?.signals.suspectScore).toBe(0)
+    expect(result?.signals.distinctIp?.twentyFourHours).toBe(2)
+  })
+
+  it('stores the event but drops the components dump', async () => {
+    const fixture = enrichedFixture()
+    ;(fixture.products.identification.data as Record<string, unknown>).components = {
+      canvas: { value: 'huge' },
+    }
+    mockGetEvent.mockResolvedValue(fixture)
+
+    const result = await verifyFingerprint('pro-request-id', { visitorId: 'server-visitor' })
+    const raw = result?.rawEvent as {
+      products: { identification: { data: Record<string, unknown> } }
+    }
+
+    expect(raw.products.identification.data.components).toBeUndefined()
+    expect(raw.products.identification.data.visitorId).toBe('server-visitor')
+    // The source object must not be mutated — it is the caller's event.
+    expect(
+      (fixture.products.identification.data as Record<string, unknown>).components,
+    ).toBeDefined()
+  })
+
+  it('leaves every enriched field null when the products are absent', async () => {
+    mockGetEvent.mockResolvedValue(eventFixture())
+
+    const result = await verifyFingerprint('pro-request-id', { visitorId: 'server-visitor' })
+
+    expect(result?.details.ipCity).toBeNull()
+    expect(result?.details.asn).toBeNull()
+    expect(result?.signals.suspectScore).toBeNull()
+    expect(result?.signals.datacenter).toBeNull()
   })
 })
 
@@ -356,7 +495,107 @@ describe('formatSignals', () => {
   })
 })
 
+describe('ipDistanceKm', () => {
+  it('returns null unless both sides resolved coordinates', () => {
+    expect(ipDistanceKm({ lat: 30.26, lon: -97.74 }, { lat: null, lon: null })).toBeNull()
+    expect(ipDistanceKm({ lat: null, lon: null }, { lat: 52.37, lon: 4.89 })).toBeNull()
+  })
+
+  it('measures a known distance', () => {
+    // Austin to Amsterdam is roughly 8,300km great-circle.
+    const km = ipDistanceKm({ lat: 30.2671, lon: -97.7431 }, { lat: 52.3676, lon: 4.9041 })
+    expect(km).toBeGreaterThan(8000)
+    expect(km).toBeLessThan(8600)
+  })
+
+  it('returns zero for the same point', () => {
+    expect(ipDistanceKm({ lat: 30.26, lon: -97.74 }, { lat: 30.26, lon: -97.74 })).toBe(0)
+  })
+})
+
+describe('formatLocation / formatNetwork', () => {
+  it('renders what resolved and nothing more', () => {
+    expect(
+      formatLocation({ ipCity: 'Austin', ipSubdivision: 'Texas', ipCountry: 'United States', ipAccuracyRadius: 20 }),
+    ).toBe('Austin, Texas, United States (±20km)')
+    expect(formatNetwork({ asn: '16591', asnName: 'Google Fiber Inc.', asnType: 'isp' })).toBe(
+      'Google Fiber Inc. (AS16591, isp)',
+    )
+  })
+
+  it('returns null rather than a string of unknowns when nothing resolved', () => {
+    expect(formatLocation({})).toBeNull()
+    expect(formatNetwork({})).toBeNull()
+  })
+})
+
+describe('formatSignals enrichment', () => {
+  it('reports the ML score beside the verdict, since a near-miss reads as a pass without it', () => {
+    const out = formatSignals({
+      ...NO_SIGNALS,
+      serverVerified: true,
+      stale: false,
+      tamperingDetail: { result: false, confidence: 'high', mlScore: 0.94 },
+    })
+
+    expect(out).toContain('0.94')
+    expect(out).toContain('high confidence')
+  })
+
+  it('renders velocity counters per interval', () => {
+    const out = formatSignals({
+      ...NO_SIGNALS,
+      serverVerified: true,
+      stale: false,
+      distinctCountry: { fiveMinutes: 1, oneHour: 3, twentyFourHours: null },
+    })
+
+    expect(out).toContain('1 in 5min')
+    expect(out).toContain('3 in 1hr')
+    // Omitted above 20k events, so absence is a cap and must not read as zero
+    expect(out).not.toContain('24hr')
+  })
+
+  it('omits a scored signal entirely when the product returned nothing', () => {
+    const out = formatSignals({
+      ...NO_SIGNALS,
+      serverVerified: true,
+      stale: false,
+      vpnDetail: { result: null, confidence: null, mlScore: null },
+    })
+
+    expect(out).not.toContain('VPN')
+  })
+})
+
 describe('formatDerivedSignals', () => {
+  it('always pairs distance with its uncertainty', () => {
+    const out = formatDerivedSignals({
+      ...NO_SIGNALS,
+      ipDistanceKm: 12,
+      ipDistanceUncertaintyKm: 40,
+    })
+
+    // 12km inside a 40km combined radius is not movement, and the model must be
+    // told so rather than left to infer travel from a bare number.
+    expect(out).toContain('12 km')
+    expect(out).toContain('40 km')
+    expect(out).toContain('not evidence of movement')
+  })
+
+  it('reports the distance bare when the uncertainty is unknown', () => {
+    const out = formatDerivedSignals({
+      ...NO_SIGNALS,
+      ipDistanceKm: 12,
+      ipDistanceUncertaintyKm: null,
+    })
+
+    // No radius clause at all rather than one claiming 0 km of uncertainty,
+    // which would read as perfect precision.
+    expect(out).toContain('12 km')
+    expect(out).not.toContain('accuracy radius')
+  })
+
   it('renders only the flags this app worked out for itself', () => {
     const out = formatDerivedSignals({
       ...NO_SIGNALS,

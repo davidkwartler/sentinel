@@ -13,6 +13,7 @@ type DetectionEventRow = {
 }
 
 type FingerprintRow = {
+  id: string
   visitorId: string
   ip: string | null
   userAgent: string | null
@@ -23,6 +24,23 @@ type FingerprintRow = {
   verification: string
   isOriginal: boolean
   createdAt: Date | string
+  // Server-observed. All null in OSS mode and whenever verification did not
+  // resolve, which is why the details panel hides itself rather than rendering
+  // a column of dashes.
+  osVersion: string | null
+  browserVersion: string | null
+  device: string | null
+  ipTimezone: string | null
+  ipCity: string | null
+  ipCountry: string | null
+  ipSubdivision: string | null
+  ipAccuracyRadius: number | null
+  asn: string | null
+  asnName: string | null
+  asnType: string | null
+  firstSeenAt: Date | string | null
+  lastSeenAt: Date | string | null
+  suspectScore: number | null
 }
 
 // Whether the components beside this label were observed by Fingerprint's
@@ -225,8 +243,11 @@ export function SessionTable({
                       !isOrig && !!original && f[field] !== original[field]
 
                     return (
+                      // Keyed by id, not index: the details panel below holds
+                      // open/raw state, and index keys hand that state to a
+                      // different fingerprint the moment the list shifts.
                       <div
-                        key={i}
+                        key={f.id}
                         className={`rounded-md border p-3 text-xs ${
                           isOrig
                             ? "border-gray-200 bg-white"
@@ -252,6 +273,7 @@ export function SessionTable({
                           <FpField label="Screen" value={f.screenRes} diff={isDiff("screenRes")} />
                           <FpField label="Timezone" value={f.timezone} diff={isDiff("timezone")} />
                         </div>
+                        <FullDetails fingerprint={f} original={original} />
                       </div>
                     )
                   })}
@@ -541,6 +563,215 @@ function VerificationBadge({ verification }: { verification: string }) {
     </span>
   )
 }
+
+/**
+ * Server-observed detail, collapsed by default.
+ *
+ * Hides itself entirely when nothing resolved rather than rendering a column of
+ * dashes: in OSS mode none of these exist, and an empty expander invites the
+ * reader to think data is missing rather than inapplicable.
+ */
+function FullDetails({
+  fingerprint: f,
+  original,
+}: {
+  fingerprint: FingerprintRow
+  original: FingerprintRow | undefined
+}) {
+  const [open, setOpen] = useState(false)
+  const [raw, setRaw] = useState<string | null>(null)
+  const [rawState, setRawState] = useState<
+    "idle" | "loading" | "empty" | "error"
+  >("idle")
+
+  const populated = DETAIL_GROUPS.map((group) => ({
+    title: group.title,
+    rows: group.rows
+      .map((row) => ({ row, value: row.render(f) }))
+      .filter((r) => r.value !== null),
+  })).filter((g) => g.rows.length > 0)
+
+  if (populated.length === 0) return null
+
+  async function loadRaw() {
+    if (raw !== null) {
+      setRaw(null)
+      return
+    }
+    setRawState("loading")
+    try {
+      const { getRawEvent } = await import("@/app/(shop)/sessions/actions")
+      const event = await getRawEvent(f.id)
+      if (event === null) {
+        setRawState("empty")
+        return
+      }
+      setRaw(JSON.stringify(event, null, 2))
+      setRawState("idle")
+    } catch (err) {
+      // A rejected server action (expired auth, network blip) would otherwise
+      // leave the button reading "Loading…" forever with nothing in the UI to
+      // say the fetch died.
+      console.error("[Sentinel] raw event fetch failed:", err)
+      setRawState("error")
+    }
+  }
+
+  return (
+    <div className="mt-3 border-t border-black/5 pt-2">
+      <button
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        className="text-[11px] font-medium text-gray-600 underline underline-offset-2 hover:text-gray-900"
+      >
+        {open ? "Hide" : "Full"} details
+      </button>
+
+      {open && (
+        <div className="mt-2 space-y-2">
+          {populated.map((group) => (
+            <div key={group.title}>
+              <p className="text-[10px] font-medium uppercase tracking-wide text-gray-400">
+                {group.title}
+              </p>
+              <div className="mt-0.5 space-y-0.5">
+                {group.rows.map(({ row, value }) => {
+                  // Same render function on both sides, so the comparison is
+                  // between two formatted values rather than between a formatted
+                  // one and whatever a second code path happened to produce.
+                  const originalValue =
+                    row.diffable && original ? row.render(original) : null
+                  return (
+                    <FpField
+                      key={row.label}
+                      label={row.label}
+                      value={value}
+                      diff={
+                        !f.isOriginal &&
+                        originalValue !== null &&
+                        originalValue !== value
+                      }
+                    />
+                  )
+                })}
+              </div>
+            </div>
+          ))}
+
+          <div className="pt-1">
+            <button
+              onClick={loadRaw}
+              aria-expanded={raw !== null}
+              className="text-[11px] font-medium text-gray-600 underline underline-offset-2 hover:text-gray-900"
+            >
+              {raw !== null ? "Hide" : "Raw JSON"}
+            </button>
+            {rawState === "loading" && (
+              <span className="ml-2 text-[11px] text-gray-500">Loading…</span>
+            )}
+            {rawState === "empty" && (
+              <span className="ml-2 text-[11px] text-gray-500">
+                No server event stored for this fingerprint.
+              </span>
+            )}
+            {rawState === "error" && (
+              <span className="ml-2 text-[11px] text-amber-700">
+                Could not load the server event — try again.
+              </span>
+            )}
+            {raw !== null && (
+              <pre className="mt-2 max-h-80 overflow-auto rounded border border-gray-200 bg-white p-2 text-[10px] leading-relaxed text-gray-700">
+                {raw}
+              </pre>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+/**
+ * The rows of the detail panel, as data.
+ *
+ * `render` is applied to both the fingerprint being shown and the original, so
+ * the diff compares two values produced the same way — a label can be reworded
+ * without silently switching its row off. `diffable: false` marks the rows that
+ * legitimately differ between two captures of the same device (accuracy radius,
+ * first/last seen, suspect score), where highlighting would be noise.
+ */
+const DETAIL_GROUPS: {
+  title: string
+  rows: {
+    label: string
+    diffable: boolean
+    render: (f: FingerprintRow) => string | null
+  }[]
+}[] = [
+  {
+    title: "Location",
+    rows: [
+      {
+        label: "City",
+        diffable: true,
+        render: (f) =>
+          [f.ipCity, f.ipSubdivision, f.ipCountry].filter(Boolean).join(", ") ||
+          null,
+      },
+      {
+        // Named "accuracy" rather than shown as a bare number: it is the reason
+        // a small distance between two locations means nothing.
+        label: "Accuracy",
+        diffable: false,
+        render: (f) =>
+          f.ipAccuracyRadius !== null ? `±${f.ipAccuracyRadius} km` : null,
+      },
+      { label: "Timezone (from IP)", diffable: true, render: (f) => f.ipTimezone },
+    ],
+  },
+  {
+    title: "Network",
+    rows: [
+      { label: "Provider", diffable: true, render: (f) => f.asnName },
+      {
+        label: "ASN",
+        diffable: true,
+        render: (f) => (f.asn ? `AS${f.asn}` : null),
+      },
+      { label: "Type", diffable: true, render: (f) => f.asnType },
+    ],
+  },
+  {
+    title: "Device",
+    rows: [
+      { label: "OS version", diffable: true, render: (f) => f.osVersion },
+      { label: "Browser version", diffable: true, render: (f) => f.browserVersion },
+      { label: "Device", diffable: true, render: (f) => f.device },
+    ],
+  },
+  {
+    title: "History",
+    rows: [
+      {
+        label: "First seen",
+        diffable: false,
+        render: (f) =>
+          f.firstSeenAt ? new Date(f.firstSeenAt).toISOString().slice(0, 10) : null,
+      },
+      {
+        label: "Last seen",
+        diffable: false,
+        render: (f) =>
+          f.lastSeenAt ? new Date(f.lastSeenAt).toISOString().slice(0, 10) : null,
+      },
+      {
+        label: "Suspect score",
+        diffable: false,
+        render: (f) => (f.suspectScore !== null ? `${f.suspectScore}/100` : null),
+      },
+    ],
+  },
+]
 
 function FpField({
   label,

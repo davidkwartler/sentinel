@@ -27,6 +27,7 @@ export default async function DashboardPage() {
         orderBy: { createdAt: "asc" },
         take: 25, // dashboard polls; bound the payload per session
         select: {
+          id: true, // addresses the on-demand rawEvent fetch
           visitorId: true,
           ip: true,
           userAgent: true,
@@ -37,6 +38,24 @@ export default async function DashboardPage() {
           verification: true,
           isOriginal: true,
           createdAt: true,
+          // Server-observed detail for the expandable panel. All small scalars,
+          // so they ride along with the poll. rawEvent deliberately does NOT —
+          // it is kilobytes per fingerprint and this page refetches every 8s,
+          // so it is fetched on demand instead (see actions.ts).
+          osVersion: true,
+          browserVersion: true,
+          device: true,
+          ipTimezone: true,
+          ipCity: true,
+          ipCountry: true,
+          ipSubdivision: true,
+          ipAccuracyRadius: true,
+          asn: true,
+          asnName: true,
+          asnType: true,
+          firstSeenAt: true,
+          lastSeenAt: true,
+          suspectScore: true,
         },
       },
       detectionEvents: {
