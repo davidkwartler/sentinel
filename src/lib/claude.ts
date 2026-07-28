@@ -1,7 +1,11 @@
 import Anthropic from "@anthropic-ai/sdk"
 import { prisma } from "@/lib/db"
 import { DEFAULT_MODEL, DEFAULT_FLAG_THRESHOLD } from "@/lib/settings"
-import { formatSignals, type FingerprintSignals } from "@/lib/fingerprint-server"
+import {
+  formatDerivedSignals,
+  formatSignals,
+  type FingerprintSignals,
+} from "@/lib/fingerprint-server"
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
@@ -49,6 +53,16 @@ evidence of an attacker actively evading detection — raise the score sharply e
 device characteristics match, since matching characteristics may themselves be forged.
 - Low identification confidence means the visitor ID itself is unreliable — lean on OS, \
 browser, and screen instead.
+Only signals available on the current Fingerprint plan are listed. A signal that does not \
+appear was not measured — treat it as unknown, and do NOT read its absence as evidence \
+either way. Judge on the signals present plus the device characteristics.
+If the whole block is absent, verification was unavailable and the fingerprint fields are \
+client-reported and unverified; be somewhat more cautious about treating a clean match as proof.
+
+LOCALLY DERIVED SIGNALS: A separate 'LOCALLY DERIVED SIGNALS' block, when present, was \
+worked out by this application from its own records. It did NOT come from Fingerprint's \
+server API and carries less weight than the server-verified block above, though more than \
+the client-reported fingerprint fields, since the client does not control it:
 - Verification downgraded from established session = yes means this session started under \
 server-verified identification and this fingerprint reports one that cannot be verified — \
 treat this as evasion evidence and raise the score, not as a benign mode change.
@@ -57,11 +71,8 @@ resolution, or timezone did not look like a real device value and was replaced b
 this prompt — a client reporting components that match no real device is misreporting, which is \
 itself an indicator, though a weaker one than the signals above since it can also result from a \
 misconfigured or unusual browser.
-Only signals available on the current Fingerprint plan are listed. A signal that does not \
-appear was not measured — treat it as unknown, and do NOT read its absence as evidence \
-either way. Judge on the signals present plus the device characteristics.
-If the whole block is absent, verification was unavailable and the fingerprint fields are \
-client-reported and unverified; be somewhat more cautious about treating a clean match as proof.
+This block appearing on its own, with no server-verified block, means verification was \
+unavailable for this fingerprint — which is itself what the downgrade signal is reporting.
 
 CONFIDENCE SCORE CALIBRATION:
 - 0–20: clearly benign — same device characteristics, only visitor ID or IP differs
@@ -159,6 +170,14 @@ export async function analyzeDetectionEvent(
 
   const model = modelOverride ?? process.env.ANTHROPIC_MODEL ?? DEFAULT_MODEL
 
+  // Two blocks, never one. The signals object also carries flags this app
+  // derived for itself (downgrade, shape anomaly), and those can be set when no
+  // server lookup happened at all — folding them into the server-verified block
+  // would tell the model that Fingerprint observed something it never saw, under
+  // a heading the system prompt instructs it to trust above everything else.
+  const serverBlock = signals?.serverVerified ? formatSignals(signals) : ""
+  const derivedBlock = signals ? formatDerivedSignals(signals) : ""
+
   const response = await anthropic.messages.create({
     model,
     max_tokens: 512,
@@ -171,8 +190,11 @@ export async function analyzeDetectionEvent(
           formatFingerprint(original) +
           `\n\nNEW FINGERPRINT (accessing the same session):\n` +
           formatFingerprint(newest) +
-          (signals
-            ? `\n\nSERVER-VERIFIED SIGNALS (from Fingerprint's server API, for the new fingerprint):\n${formatSignals(signals)}`
+          (serverBlock
+            ? `\n\nSERVER-VERIFIED SIGNALS (from Fingerprint's server API, for the new fingerprint):\n${serverBlock}`
+            : "") +
+          (derivedBlock
+            ? `\n\nLOCALLY DERIVED SIGNALS (worked out by this application, not from Fingerprint):\n${derivedBlock}`
             : "") +
           `\n\nComponent similarity score: ${event.similarityScore.toFixed(2)} (0=completely different, 1=identical)\n\n` +
           "Analyze whether this represents a session hijack or a false positive (e.g. incognito browsing, fingerprint drift).",

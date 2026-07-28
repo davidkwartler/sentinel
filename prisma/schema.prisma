@@ -51,7 +51,14 @@ model Fingerprint {
   id           String   @id @default(cuid())
   // Owning user, independent of the session — a detection event's evidence
   // must survive the session it was observed on being deleted (sign-out).
-  userId       String
+  //
+  // Optional at the database level, always written by the application. Making
+  // it required would mean `prisma db push` had to add a NOT NULL column with
+  // no default to a populated table, which Postgres rejects outright, and would
+  // break every insert from the previously-deployed build during the window
+  // between migrating and shipping. Nullable removes both hazards: push, deploy,
+  // and backfill in any order. See scripts/backfill-user-ownership.mjs.
+  userId       String?
   // Optional and SetNull on delete: sign-out deletes the Session row, and this
   // Fingerprint should survive that as an orphaned record, not be cascaded away.
   sessionId    String?
@@ -68,7 +75,7 @@ model Fingerprint {
   verification String   @default("unknown")
   isOriginal   Boolean  @default(false)
   createdAt    DateTime @default(now())
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user         User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
   session      Session? @relation(fields: [sessionId], references: [id], onDelete: SetNull)
 
   @@index([userId])
@@ -87,8 +94,9 @@ model VerificationToken {
 model DetectionEvent {
   id                String   @id @default(cuid())
   createdAt         DateTime @default(now())
-  // Owning user, independent of the session — see Fingerprint.userId.
-  userId            String
+  // Owning user, independent of the session. Optional at the database level and
+  // always written by the application — see Fingerprint.userId for why.
+  userId            String?
   // Optional and SetNull: this event is the app's whole output ("we detected
   // this"), so it must outlive the session it was observed on being deleted.
   sessionId         String?
@@ -114,7 +122,7 @@ model DetectionEvent {
   status            String   @default("PENDING")
   confidenceScore   Float?
   reasoning         String?  @db.Text
-  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user              User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
   session           Session? @relation(fields: [sessionId], references: [id], onDelete: SetNull)
 
   @@index([userId])

@@ -17,9 +17,31 @@ import { resolveFingerprint } from "@/lib/fingerprint-server"
 
 const KNOWN_OS_SET = new Set<string>(KNOWN_OS)
 const KNOWN_BROWSER_SET = new Set<string>(KNOWN_BROWSERS)
-// Built once at module scope, not per request — Intl.supportedValuesOf reads
-// the ICU timezone database, which doesn't change between requests.
-const VALID_TIMEZONES = new Set(Intl.supportedValuesOf("timeZone"))
+
+// Ask ICU whether it would accept the zone, rather than testing membership of
+// Intl.supportedValuesOf("timeZone"). That list holds only canonical zone names
+// and excludes values real browsers genuinely report: "UTC" is absent from it in
+// both Node and Chromium, as is every "Etc/GMT±N", and engines disagree on
+// whether to canonicalize aliases (Node and Chromium report "Asia/Calcutta"
+// where others report "Asia/Kolkata" — the list contains only the former).
+//
+// Membership therefore flagged real browsers as malformed. "UTC" in particular
+// is what Firefox reports under privacy.resistFingerprinting (Tor Browser's
+// default) and what Brave reports under strict fingerprint blocking, so the
+// check penalised exactly the privacy-hardened users most likely to look
+// unusual already — nulling their timezone and raising their score for it.
+//
+// The constructor accepts every zone ICU knows, aliases and UTC included, and
+// still throws RangeError on "", "$(whoami)", or an injection string, which is
+// what this check exists to catch.
+function isValidTimezone(value: string): boolean {
+  try {
+    new Intl.DateTimeFormat("en", { timeZone: value })
+    return true
+  } catch {
+    return false
+  }
+}
 
 // Length caps double as prompt-injection hardening: these values are
 // interpolated into the Claude analysis prompt, so keep them short and
@@ -134,7 +156,7 @@ export async function POST(request: NextRequest) {
 
   const rawTimezone = data.timezone ?? null
   const timezone =
-    rawTimezone !== null && VALID_TIMEZONES.has(rawTimezone) ? rawTimezone : null
+    rawTimezone !== null && isValidTimezone(rawTimezone) ? rawTimezone : null
   if (rawTimezone !== null && timezone === null) shapeAnomaly = true
 
   let os = verified?.os ?? null
@@ -248,6 +270,11 @@ export async function POST(request: NextRequest) {
     // before it reaches the prompt. Construct a signals-shaped object with
     // null fields when that's the only thing worth reporting. shapeAnomaly
     // travels the same way.
+    //
+    // serverVerified and a null `stale` are what keep that object honest: with
+    // no lookup there is no event timestamp, and claude.ts renders the derived
+    // flags under their own heading rather than passing them off as things
+    // Fingerprint observed.
     const signalsForAnalysis =
       signals || detectionResult.downgraded || shapeAnomaly
         ? {
@@ -257,7 +284,8 @@ export async function POST(request: NextRequest) {
             tampered: signals?.tampered ?? null,
             replayed: signals?.replayed ?? null,
             confidence: signals?.confidence ?? null,
-            stale: signals?.stale ?? false,
+            stale: signals?.stale ?? null,
+            serverVerified: signals !== null,
             downgraded: detectionResult.downgraded ?? null,
             shapeAnomaly,
           }

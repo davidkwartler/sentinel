@@ -26,6 +26,7 @@ import {
   verifyFingerprint,
   resolveFingerprint,
   formatSignals,
+  formatDerivedSignals,
   checkServerApiHealth,
   getCachedServerApiHealth,
   describeErrorCode,
@@ -292,32 +293,35 @@ describe('describeErrorCode', () => {
   })
 })
 
+const NO_SIGNALS = {
+  incognito: null,
+  vpn: null,
+  bot: null,
+  tampered: null,
+  replayed: null,
+  confidence: null,
+  stale: null,
+  serverVerified: false,
+} as const
+
 describe('formatSignals', () => {
   it('omits signals the plan did not provide', () => {
-    const out = formatSignals({
-      incognito: null,
-      vpn: null,
-      bot: null,
-      tampered: null,
-      replayed: null,
-      confidence: null,
-      stale: false,
-    })
+    const out = formatSignals({ ...NO_SIGNALS, stale: false, serverVerified: true })
 
     expect(out).not.toContain('Incognito')
     expect(out).not.toContain('VPN')
     expect(out).not.toContain('confidence')
-    // Staleness is derived locally, so it is always reported
+    // Derived from the event timestamp rather than a paid signal, so it is
+    // reported whenever an event was actually resolved
     expect(out).toContain('replay window: no')
   })
 
   it('includes only the signals that are present', () => {
     const out = formatSignals({
+      ...NO_SIGNALS,
+      serverVerified: true,
       incognito: true,
-      vpn: null,
       bot: false,
-      tampered: null,
-      replayed: null,
       confidence: 0.97,
       stale: false,
     })
@@ -327,5 +331,49 @@ describe('formatSignals', () => {
     expect(out).toContain('Identification confidence: 0.97')
     expect(out).not.toContain('VPN')
     expect(out).not.toContain('tampering')
+  })
+
+  it('omits the staleness line when no event was resolved', () => {
+    // stale null means there was no identification event to age-check.
+    // Printing "not stale" here would assert a clean result the API never gave.
+    const out = formatSignals({ ...NO_SIGNALS, downgraded: true })
+
+    expect(out).toBe('')
+    expect(out).not.toContain('replay window')
+  })
+
+  it('never renders the locally-derived flags as server-observed', () => {
+    const out = formatSignals({
+      ...NO_SIGNALS,
+      serverVerified: true,
+      stale: false,
+      downgraded: true,
+      shapeAnomaly: true,
+    })
+
+    expect(out).not.toContain('downgraded')
+    expect(out).not.toContain('shape check')
+  })
+})
+
+describe('formatDerivedSignals', () => {
+  it('renders only the flags this app worked out for itself', () => {
+    const out = formatDerivedSignals({
+      ...NO_SIGNALS,
+      serverVerified: true,
+      stale: false,
+      incognito: true,
+      downgraded: true,
+      shapeAnomaly: false,
+    })
+
+    expect(out).toContain('Verification downgraded from established session: yes')
+    expect(out).toContain('Client-reported component failed its shape check: no')
+    expect(out).not.toContain('Incognito')
+    expect(out).not.toContain('replay window')
+  })
+
+  it('returns empty when there is nothing derived to report', () => {
+    expect(formatDerivedSignals({ ...NO_SIGNALS, serverVerified: true, stale: false })).toBe('')
   })
 })

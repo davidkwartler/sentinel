@@ -34,6 +34,7 @@ export default async function DashboardPage() {
           browser: true,
           screenRes: true,
           timezone: true,
+          verification: true,
           isOriginal: true,
           createdAt: true,
         },
@@ -64,13 +65,20 @@ export default async function DashboardPage() {
   const flagged = rows.filter((r) => r.detectionEvents[0]?.status === "FLAGGED").length
   const pending = rows.filter((r) => r.detectionEvents[0]?.status === "PENDING").length
 
-  // Every DetectionEvent for the user, independent of whether its session is
-  // still live. Fingerprint/DetectionEvent survive sign-out with sessionId set
-  // to null (see BACKLOG.md) — without this query, an orphaned event exists in
-  // the database but appears nowhere, since the cards above only iterate
-  // sessions with expires > now.
+  // Detection events whose session is not among the cards above — either the
+  // session was deleted by signing out (sessionId is now null, since these rows
+  // survive that rather than cascading away) or it has expired out of the live
+  // list. Without this query those rows exist in the database and appear
+  // nowhere, which is the data loss this whole change set exists to stop.
+  //
+  // Scoped to sessions NOT rendered above rather than to every event, so a
+  // flagged live session isn't listed twice on the same page.
+  const liveSessionIds = rows.map((r) => r.id)
   const detectionHistory = await prisma.detectionEvent.findMany({
-    where: { userId: session.user!.id! },
+    where: {
+      userId: session.user!.id!,
+      OR: [{ sessionId: null }, { sessionId: { notIn: liveSessionIds } }],
+    },
     orderBy: { createdAt: "desc" },
     take: DETECTION_HISTORY_LIMIT,
     select: {

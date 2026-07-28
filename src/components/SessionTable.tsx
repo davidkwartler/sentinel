@@ -20,8 +20,21 @@ type FingerprintRow = {
   browser: string | null
   screenRes: string | null
   timezone: string | null
+  verification: string
   isOriginal: boolean
   createdAt: Date | string
+}
+
+// Whether the components beside this label were observed by Fingerprint's
+// server API or merely reported by the browser. Worth showing rather than
+// storing silently: a row marked "Browser-reported" is one where every field
+// under it is a claim the client made about itself.
+const VERIFICATION_LABEL: Record<string, string> = {
+  verified: "Server-verified",
+  unresolved: "Lookup failed",
+  unverifiable: "Browser-reported",
+  not_configured: "Browser-reported",
+  unknown: "Unknown",
 }
 
 type SessionRow = {
@@ -228,6 +241,9 @@ export function SessionTable({
                             <RelativeTime value={f.createdAt} />
                           </p>
                         </div>
+                        <div className="mb-2">
+                          <VerificationBadge verification={f.verification} />
+                        </div>
                         <div className="space-y-1">
                           <FpField label="Visitor ID" value={f.visitorId} diff={isDiff("visitorId")} mono />
                           <FpField label="IP" value={f.ip} diff={isDiff("ip")} />
@@ -323,11 +339,11 @@ type DetectionHistoryRow = {
 }
 
 /**
- * Every DetectionEvent for the user, newest first — including ones whose
- * session has since been deleted (sign-out). Fingerprint and DetectionEvent
- * survive sign-out with sessionId set to null; without this list those rows
- * exist in the database but appear nowhere, since the cards above only
- * iterate live sessions.
+ * Detection events whose session is no longer in the list above, newest first —
+ * ended by signing out (sessionId null, since these rows survive that rather
+ * than cascading away) or expired. Without this list those rows exist in the
+ * database and appear nowhere. Scoped to sessions not rendered above so a
+ * flagged live session isn't shown twice on the same page.
  */
 export function DetectionHistoryList({
   events,
@@ -349,8 +365,12 @@ export function DetectionHistoryList({
 
   return (
     <div className="mt-8">
-      <p className="mb-3 text-xs font-medium uppercase tracking-wide text-gray-500">
+      <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
         Detection history
+      </p>
+      <p className="mb-3 mt-1 text-xs text-gray-500">
+        Events recorded on sessions that have since ended. Kept after sign-out,
+        which is when the session itself is deleted.
       </p>
       <div className="space-y-2">
         {events.map((event) => {
@@ -491,6 +511,34 @@ function RelativeTime({ value }: { value: Date | string }) {
     <time dateTime={iso} title={new Date(iso).toISOString()}>
       {relative ?? iso.replace("T", " ").slice(0, 16)}
     </time>
+  )
+}
+
+// Green only for a genuine server lookup. "Browser-reported" is deliberately
+// neutral rather than alarming — it's the expected state in OSS mode and
+// without a server key — while a failed lookup gets amber, since that is the
+// case where verification was meant to happen and didn't.
+function VerificationBadge({ verification }: { verification: string }) {
+  const tone =
+    verification === "verified"
+      ? "bg-green-100 text-green-700"
+      : verification === "unresolved"
+        ? "bg-amber-100 text-amber-700"
+        : "bg-gray-100 text-gray-600"
+
+  return (
+    <span
+      className={`inline-flex rounded px-1.5 py-0.5 text-[10px] font-medium ${tone}`}
+      title={
+        verification === "verified"
+          ? "Components below were observed by Fingerprint's server API, not reported by the browser."
+          : verification === "unresolved"
+            ? "The request ID could not be resolved against Fingerprint's server API — components below are the browser's own claims."
+            : "Components below are reported by the browser and were not server-verified."
+      }
+    >
+      {VERIFICATION_LABEL[verification] ?? VERIFICATION_LABEL.unknown}
+    </span>
   )
 }
 

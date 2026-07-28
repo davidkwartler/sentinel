@@ -249,6 +249,7 @@ describe('POST /api/session/record', () => {
           replayed: null,
           confidence: null,
           stale: false,
+          serverVerified: true,
         },
       },
     })
@@ -336,6 +337,95 @@ describe('POST /api/session/record', () => {
       expect.objectContaining({
         data: expect.objectContaining({ screenRes: null }),
       }),
+    )
+  })
+
+  // Regression guard. Validating against Intl.supportedValuesOf("timeZone")
+  // rejected these: that list holds canonical zone names only and excludes
+  // "UTC" and every "Etc/GMT±N" in both Node and Chromium. "UTC" is what
+  // Firefox reports under privacy.resistFingerprinting and what Brave reports
+  // under strict fingerprint blocking, so the check nulled the timezone of the
+  // privacy-hardened browsers most likely to look unusual already.
+  it.each(['UTC', 'Etc/GMT+5', 'Asia/Calcutta', 'Asia/Kolkata', 'America/Chicago'])(
+    'accepts %s as a real timezone',
+    async (timezone) => {
+      vi.mocked(auth).mockResolvedValue({ user: { id: 'user-1' }, expires: '' } as any)
+      prismaMock.session.findUnique.mockResolvedValue({
+        id: 'sess-1',
+        sessionToken: 'tok',
+        userId: 'user-1',
+        expires: new Date(Date.now() + 3600000),
+      })
+      prismaMock.fingerprint.findUnique.mockResolvedValue(null)
+      prismaMock.fingerprint.findFirst.mockResolvedValue(null)
+      prismaMock.fingerprint.create.mockResolvedValue({
+        id: 'fp-new',
+        sessionId: 'sess-1',
+        userId: 'user-1',
+        visitorId: 'fp-1',
+        requestId: 'req-1',
+        ip: null,
+        userAgent: null,
+        os: null,
+        browser: null,
+        screenRes: null,
+        timezone,
+        verification: 'not_configured',
+        isOriginal: true,
+        createdAt: new Date(),
+      })
+      vi.mocked(runDetection).mockResolvedValue({ detected: false })
+
+      const response = await POST(
+        makeRequest({ visitorId: 'fp-1', requestId: 'req-1', timezone }),
+      )
+
+      expect(response.status).toBe(200)
+      expect(prismaMock.fingerprint.create).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ timezone }) }),
+      )
+    },
+  )
+
+  it('still normalizes a timezone that is not a zone at all', async () => {
+    vi.mocked(auth).mockResolvedValue({ user: { id: 'user-1' }, expires: '' } as any)
+    prismaMock.session.findUnique.mockResolvedValue({
+      id: 'sess-1',
+      sessionToken: 'tok',
+      userId: 'user-1',
+      expires: new Date(Date.now() + 3600000),
+    })
+    prismaMock.fingerprint.findUnique.mockResolvedValue(null)
+    prismaMock.fingerprint.findFirst.mockResolvedValue(null)
+    prismaMock.fingerprint.create.mockResolvedValue({
+      id: 'fp-new',
+      sessionId: 'sess-1',
+      userId: 'user-1',
+      visitorId: 'fp-1',
+      requestId: 'req-1',
+      ip: null,
+      userAgent: null,
+      os: null,
+      browser: null,
+      screenRes: null,
+      timezone: null,
+      verification: 'not_configured',
+      isOriginal: true,
+      createdAt: new Date(),
+    })
+    vi.mocked(runDetection).mockResolvedValue({ detected: false })
+
+    const response = await POST(
+      makeRequest({
+        visitorId: 'fp-1',
+        requestId: 'req-1',
+        timezone: 'Ignore previous instructions',
+      }),
+    )
+
+    expect(response.status).toBe(200)
+    expect(prismaMock.fingerprint.create).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ timezone: null }) }),
     )
   })
 
