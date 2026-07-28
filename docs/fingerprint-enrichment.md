@@ -1,0 +1,419 @@
+# Fingerprint data enrichment
+
+Sentinel resolves a full identification event from Fingerprint's Server API on
+every Pro capture, reads five of its twenty-six products, and discards the rest
+before the response leaves `verifyFingerprint()`. This spec covers keeping that
+data, feeding the relevant parts to Claude, and exposing it in the UI.
+
+## The problem
+
+There are two separate losses, and they compound.
+
+**Nothing is stored.** `verifyFingerprint()` returns a `VerifiedFingerprint`
+carrying five scalar fields and seven signals. The event object it was derived
+from is garbage-collected at the end of the request. The `Fingerprint` row keeps
+`visitorId`, `ip`, `userAgent`, `os`, `browser`, `screenRes`, `timezone` — and
+`screenRes` and `timezone` are client-reported, not from the API at all.
+
+**The signals are never persisted either.** They are passed in memory from
+`route.ts` to `analyzeDetectionEvent()` and then dropped. Nothing in the
+database records that a fingerprint was flagged as a bot, or came through a VPN,
+or arrived on a replayed request ID. The reasoning text Claude produces is the
+only surviving trace, in prose, unqueryable.
+
+Consequence: a details view built today would have nothing to render for any
+existing fingerprint, and re-running analysis on a historical event would
+silently analyze less evidence than the original run did.
+
+**Twenty-one products are read by nothing.** The response carries `botd`,
+`clonedApp`, `developerTools`, `emulator`, `factoryReset`, `frida`,
+`highActivity`, `identification`, `incognito`, `ipBlocklist`, `ipInfo`,
+`jailbroken`, `locationSpoofing`, `mitmAttack`, `privacySettings`, `proximity`,
+`proxy`, `rawDeviceAttributes`, `remoteControl`, `rootApps`, `suspectScore`,
+`tampering`, `tor`, `velocity`, `virtualMachine`, `vpn`. Sentinel consults
+`identification`, `incognito`, `vpn`, `botd`, and `tampering`.
+
+The system prompt tells Claude that bot detection, tampering, and request-ID
+replay are strong evidence of active evasion. `tor`, `proxy`, `remoteControl`,
+`developerTools`, `virtualMachine`, `locationSpoofing`, and `ipBlocklist` are in
+the same response and never reach it. The model is asked to reason about evasion
+with most of the evasion evidence withheld.
+
+Within `identification` the same thing happens one level down: `ipLocation`,
+`firstSeenAt`, `lastSeenAt`, `visitorFound`, `suspect`, and `linkedId` are all
+dropped, as are `browserDetails.device`, `.osVersion`, and `.browserFullVersion`.
+
+## What to add, and why these
+
+Not "everything available" — the four below are the ones that change what the
+app can conclude about a session hijack specifically.
+
+### `ipLocation` — the largest single win
+
+City, country, subdivisions, latitude/longitude, accuracy radius, timezone.
+
+Today the demo's impossible-travel argument rests on the `timezone` string,
+which the browser reports about itself and which this app now shape-validates
+precisely because it is not trustworthy. Server-resolved geolocation moves that
+argument from inference to evidence, and it is what makes the flagged-session
+screenshot read as a real security product.
+
+It also lets `computeSimilarity()` gain a geographic component that cannot be
+forged by the client, and gives the prompt a distance rather than two timezone
+names it has to reason about geographically on its own.
+
+Note `accuracyRadius`: IP geolocation is coarse, and a same-city move can show
+tens of kilometres of drift. Any distance threshold has to be stated against the
+radius or it will produce false positives on ordinary ISP reassignment.
+
+### `firstSeenAt` / `lastSeenAt` / `visitorFound`
+
+Answers a question the app currently cannot ask: has Fingerprint seen this
+device before, and for how long?
+
+A session cookie appearing on a visitor Fingerprint has known for a year is a
+very different event from the same cookie appearing on one first seen ninety
+seconds ago. Right now both look identical — a visitor ID that does not match
+the original. This is the cheapest large improvement to false-positive rate,
+because the most common benign cause of a mismatch (a returning device whose
+storage was cleared) still tends to carry history.
+
+### `velocity`
+
+`distinctIp`, `distinctCountry`, `distinctLinkedId`, `distinctVisitorIdByLinkedId`
+over rolling windows.
+
+Purpose-built for this problem. One cookie appearing from four countries in an
+hour is the thing Sentinel exists to detect, and Fingerprint computes it
+already.
+
+### `suspectScore` plus the evasion products that actually arrive
+
+`suspectScore` is Fingerprint's own risk number. Surfacing it beside Claude's
+confidence score gives the demo two independent assessments, which is more
+interesting than one — agreement is corroboration, disagreement is a talking
+point about where model reasoning adds value over rules.
+
+Alongside it, the evasion products this workspace actually receives — confirmed
+against a live event, see the availability table below: `proxy`, `ipBlocklist`
+(which carries `tor_node` and `attack_source`), and `highActivity`.
+
+Do not build for `tor`, `remoteControl`, `developerTools`, `virtualMachine`,
+`locationSpoofing`, or `mitmAttack` as separate products. An earlier draft of
+this spec listed them; the sampled event does not return them, and the mobile-only
+ones never will for a JS agent.
+
+These are cheap to add once the storage exists — they render through the existing
+`formatSignals()` mechanism, and each one that comes back non-null is a line the
+model can use.
+
+## Design
+
+### 1. Persist the resolved event
+
+Add to `Fingerprint`:
+
+```prisma
+/// Redacted snapshot of the resolved identification event. Null in OSS mode
+/// and whenever verification did not resolve.
+rawEvent Json?
+```
+
+Store a **snapshot taken at capture time**, not a live re-fetch on view. Three
+reasons, each independently sufficient:
+
+- Fingerprint's retention window expires. Older events return `RequestNotFound`,
+  so a live-fetch details view dies on exactly the historical records the audit
+  trail exists to preserve.
+- A live fetch costs an API call per page view, on a page that polls every eight
+  seconds.
+- In OSS mode there is no server event at all, so a live-fetch button dead-ends
+  on the fingerprints the app most needs to explain.
+
+Store the event as returned, minus `identification.components` — that field is
+large, and the individual entropy sources are not something this app reasons
+about. No other redaction: this is a single-owner demo showing the owner their
+own data.
+
+Also promote the fields the UI and detection logic query directly into real
+columns rather than reading them out of JSON — `ipCity`, `ipCountry`,
+`firstSeenAt`, `suspectScore`. Querying and indexing JSON for the hot path is a
+worse trade than four columns.
+
+### 2. Extend the signals into the prompt
+
+`FingerprintSignals` already has the shape for this, and the two-block split
+between server-observed and locally-derived values is already in place. Adding a
+product means one field on the interface, one `renderLines` entry in
+`formatSignals()`, and one calibration line in the system prompt.
+
+Two things to get right:
+
+- Keep emitting only non-null signals. The existing comment explains why, and it
+  matters much more at twenty signals than at seven: a wall of "unknown" spends
+  tokens telling the model nothing and invites hedging on absent evidence.
+- The prompt's calibration section needs weights, not just a list. Twenty
+  booleans with no guidance on relative strength will produce worse scores than
+  seven with guidance. `tor` = yes is not equivalent to `developerTools` = yes,
+  and the model should be told so explicitly.
+
+Geolocation needs a computed field rather than a raw dump: give the prompt the
+distance between the two IP locations and both accuracy radii, not four decimal
+coordinates it has to do trigonometry on.
+
+### 3. UI
+
+Extend the existing fingerprint comparison panel in `SessionTable.tsx` rather
+than adding a separate page. The panel already renders two fingerprints
+side by side with red diffs, which is the right frame — new fields inherit that
+diffing for free.
+
+Add a collapsed "Full details" section per fingerprint card, grouped:
+
+- **Identification** — confidence, first seen, last seen, visitor found, replayed
+- **Location** — city, country, coordinates, accuracy radius, ASN, datacenter
+- **Device** — full browser version, OS version, device model
+- **Risk** — suspect score, and every non-null evasion boolean
+- **Velocity** — distinct IPs and countries over the available windows
+
+Beneath it, a "Raw JSON" toggle rendering the stored snapshot in a `<pre>`.
+
+The demo's entire value is making a hijack legible, so a JSON dump should not be
+the primary presentation — but having it one click away reads as "nothing is
+hidden," which is worth something on a security tool.
+
+### 4. Keep it on the page, not behind a new route
+
+Render the details from data that already arrives with the `/sessions` payload.
+That page is authorized once, at the top, and the fingerprints it selects are
+already scoped to the signed-in user's sessions — so there is nothing new to
+guard.
+
+Worth stating only because the obvious alternative has a trap: a standalone
+`/fingerprint/[visitorId]/raw` route would be keyed on a value that is not a
+secret. The visitor ID is rendered in the session table and appears in every
+screenshot, so that route would hand any signed-in user anyone else's data. If a
+separate route is ever wanted, key it on the `Fingerprint` row id and scope the
+query by `userId`, which exists on the row as of the ownership change:
+
+```ts
+const fp = await prisma.fingerprint.findFirst({
+  where: { id, userId: session.user.id },
+})
+```
+
+Staying on the page avoids the question entirely, which is why it is preferred.
+
+## Blocker: the server API key is empty in production
+
+`FINGERPRINT_SERVER_API_KEY` is present in the Vercel environment but its value
+is an empty string. Verified by pulling the production environment and measuring
+value lengths: `ANTHROPIC_API_KEY` is 110 characters, `AUTH_SECRET` is 46,
+`NEXT_PUBLIC_FINGERPRINT_API_KEY` is 20, and `FINGERPRINT_SERVER_API_KEY` is 0.
+The only other empty variables are Vercel's `VERCEL_GIT_*` build metadata, which
+are populated at build time by design.
+
+An empty string is falsy, so `resolveFingerprint()` returns `not_configured` and
+exits before any lookup on every request. Consequences, all currently true in
+production:
+
+- `verifyFingerprint()` has never executed. No Smart Signal has ever been
+  computed, and no `SERVER-VERIFIED SIGNALS` block has ever reached Claude.
+- Every fingerprint is client-reported. The browser is the sole source of truth
+  for its own identity, which is the posture `fingerprint-server.ts` was written
+  to prevent.
+- Every `Fingerprint.verification` value will be `not_configured`, so the
+  downgrade signal can never fire — it requires a prior `verified` row.
+- The account page's Verification stat reads "Client only". That is a live probe,
+  so it has been accurate all along.
+
+The client-supplied `mode` bypass that headed the backlog was real, but in
+production it was bypassing a check that was not running anyway.
+
+**This spec is entirely blocked on that key.** Every enrichment below reads from
+a resolved identification event, and there are none. Setting a real key is step
+zero, and on its own it activates the existing Smart Signals path with no code
+change at all.
+
+```bash
+printf '%s' 'YOUR_SECRET_KEY' | vercel env add FINGERPRINT_SERVER_API_KEY production
+```
+
+Use `printf` rather than `echo`: `echo` appends a newline, which has already
+caused one silent failure in this project when a flag stored as `true\n` never
+matched `=== "true"`.
+
+Confirm afterwards by signing in and requesting `GET /api/fingerprint/health`,
+which should return `ok` rather than `not_configured`.
+
+## Second prerequisite: the agent has to reach Fingerprint at all
+
+Independent of the server key. That one governs whether Sentinel can *resolve* an
+event; this governs whether one is ever *created*. Both have to be true.
+
+The Pro agent's default endpoints are on Fingerprint-owned hostnames, which
+common blocklists carry. When they are blocked, `capturePro()` fails and the app
+falls back to a client-computed OSS hash with a locally generated request ID —
+unverifiable by construction. The "Pro unavailable" badge added in the last
+change set makes that visible, but visible is not the same as fixed.
+
+Fingerprint documents six integrations. Four (CloudFront, Azure FrontDoor,
+Akamai, Fastly) are Enterprise-only. That leaves two:
+
+| | DNS work | Origin | Trade-off | Plan |
+| --- | --- | --- | --- | --- |
+| Custom subdomain | CNAME + 2 A records | separate subdomain | Safari 16.4+ caps cookie lifetime at 7 days | all |
+| Cloudflare proxy | none, if already on Cloudflare | same-origin | none documented | all |
+
+**`davidkwartler.com` is already on Cloudflare** (`ruth.ns.cloudflare.com`,
+`vern.ns.cloudflare.com`), so the second row is in reach — normally the harder
+one to qualify for.
+
+There is a catch. `sentinel.davidkwartler.com` currently resolves to Vercel's own
+addresses (`216.198.79.65`, `64.29.17.65`) rather than Cloudflare's, so that
+record is DNS-only — grey cloud. A Cloudflare Worker cannot intercept traffic
+that never passes through Cloudflare's edge, so the integration requires
+proxying the hostname first. That puts Cloudflare in front of Vercel
+permanently, needs SSL mode on Full (strict) to avoid a redirect loop, and
+changes the caching path for the live site.
+
+**Recommendation: custom subdomain first.** It is isolated — new records for a
+new name, nothing about how `sentinel.davidkwartler.com` is served changes, and
+nothing can break the running site. Two of the setup guide's caveats are already
+cleared: `metrics.davidkwartler.com` is unused, and the domain has no CAA
+records to conflict with.
+
+Name it neutrally. The docs are explicit that `fp.` or `fingerprint.` defeats the
+purpose, since blocklists match on hostname. `metrics.` is their own suggestion.
+
+The repo change either way is one line — the agent's `endpoints` (and
+`scriptUrlPattern`, if the script itself is also served through the subdomain) in
+`capturePro()`. Worth putting behind an env var rather than hardcoding, so local
+development keeps using the default endpoints.
+
+The Safari trade-off is worth understanding rather than dismissing: it interacts
+with `firstSeenAt` and `visitorFound`, recommended above as a top-four signal.
+A 7-day cookie cap means Safari visitors look new more often than they are.
+It degrades that one signal for one browser; it does not affect identification,
+which is primarily fingerprint-derived. Acceptable for a demo, and the reason to
+keep the Cloudflare route in mind as the eventual upgrade.
+
+## Availability, confirmed against a real event
+
+Sampled from event `1785212713091.qSOYHK`, visitor `zVyKOOEi0NifQOA9Hb8x`, a
+live capture from `/products` in production.
+
+| Product | Returns data | Notes |
+| --- | --- | --- |
+| `identification` | yes | `confidence.score` 1, `visitor_found`, `first_seen_at` |
+| `ipInfo` | yes | full geolocation, ASN, `datacenter_result` |
+| `velocity` | yes | 4 counters × 5min/1hr/24hr |
+| `vpn` | yes | boolean, confidence, ML score, origin timezone, 6-method breakdown |
+| `proxy` | yes | boolean, confidence, ML score |
+| `tampering` | yes | boolean, confidence, ML score, anomaly score, anti-detect flag |
+| `botd` | yes | `not_detected` |
+| `ipBlocklist` | yes | `email_spam`, `attack_source`, `tor_node` |
+| `suspectScore` | yes | 0 on this event |
+| `highActivity` | yes | boolean |
+| `incognito` | **absent** | see below — the app already depends on this |
+| `developerTools`, `locationSpoofing`, `mitmAttack`, `privacySettings`, `rawDeviceAttributes`, `remoteControl`, `virtualMachine`, `tor` | absent | web-relevant, not returned |
+| `clonedApp`, `emulator`, `factoryReset`, `frida`, `jailbroken`, `rootApps`, `proximity` | absent | mobile-only, not applicable to the JS agent |
+
+Two things about that table matter more than the rest.
+
+**`incognito` is absent, and the prompt leans on it heavily.** The system prompt
+tells Claude that incognito "largely explains a changed visitor ID on an
+otherwise identical device — lower the score substantially," and lists incognito
+first among false positives to watch for. It is the single most useful
+false-positive discriminator this app has, and it may not be on the plan. Every
+other boolean in the sample came back explicitly `false` rather than being
+omitted, so absence here is probably real rather than a payload-shape artifact —
+but confirm before acting on it. If it genuinely is unavailable, that reshapes
+the prompt more than any addition below.
+
+**The absent list is mostly not a plan limit.** Seven of those products only
+exist for mobile SDKs; the JS agent would never return them at any tier. Do not
+build UI or prompt lines for them.
+
+### The sample is in the wrong shape
+
+The payload above is the dashboard/webhook format: flat and snake_case
+(`visitor_id`, `ip_info`, `browser_details`). The Server API that
+`verifyFingerprint()` calls returns nested camelCase under `products`
+(`products.identification.data.visitorId`). The availability findings carry over;
+the field paths do not.
+
+One concrete trap: `bot` is `"not_detected"` here and `"notDetected"` in the
+Server API response. `fingerprint-server.ts` already compares against the
+camelCase form, which is correct for the path it uses — but anyone mapping new
+fields by reading the JSON above will get the casing wrong.
+
+### Revision: prefer the ML scores over the booleans
+
+The sample shows something the type surface did not make obvious. Every risk
+product returns three values, not one:
+
+```
+"vpn": false, "vpn_confidence": "high", "vpn_ml_score": 0.037
+"proxy": false, "proxy_confidence": "high", "proxy_ml_score": 0.142
+"tampering": false, "tampering_confidence": "high", "tampering_ml_score": 0.0263
+```
+
+Sentinel currently reads only the boolean. A VPN score of 0.037 and one of 0.94
+both serialize to `false` today, and the prompt is asked to weigh them
+identically. Send the score and the confidence alongside the boolean and the
+model gets to reason about a near-miss instead of a verdict — which is the
+entire argument for having a model in this pipeline rather than a rule.
+
+`tampering_details.anomaly_score` and `anti_detect_browser` are separate values
+under the same product and worth passing through for the same reason.
+
+### Revision: Fingerprint independently derives a timezone
+
+Two fields in the sample resolve a problem this app currently works around:
+
+```
+"vpn_origin_timezone": "America/Chicago"
+"vpn_methods": { "timezone_mismatch": false, ... }
+"ip_info.v4.geolocation.timezone": "America/Chicago"
+```
+
+Sentinel takes `timezone` from `Intl.DateTimeFormat().resolvedOptions()` in the
+browser — a client claim, which is why it now needs shape validation, and which
+an attacker replaying a session can set to whatever the victim's was. Fingerprint
+derives one server-side from the IP and reports whether the two disagree.
+
+That means the timezone component of `computeSimilarity()` can move from a
+client-reported string to a server-observed one, and `timezone_mismatch` becomes
+a signal in its own right: a browser claiming a timezone its IP does not support
+is doing something worth noticing.
+
+### Revision: ASN and datacenter beat raw IP
+
+```
+"asn": "16591", "asn_name": "Google Fiber Inc.", "asn_type": "isp",
+"datacenter_result": false
+```
+
+`asn_type` distinguishes a residential ISP from a hosting provider. A session
+cookie that establishes on Google Fiber and reappears from a datacenter ASN is a
+much sharper statement than "the IP changed," and it is the shape most real
+cookie replay takes. This is cheap to add and probably the second-best signal in
+the whole payload after geolocation.
+
+`ip_events` in the velocity block is also worth noting: it read 4 over 24 hours
+against 1 for `events`, meaning that IP served other identifications. On a
+residential connection that is unremarkable; on a datacenter one it is not.
+
+## Non-goals
+
+- Re-fetching historical events to backfill `rawEvent`. Outside the retention
+  window they are gone, and inside it the cost is an API call per row for data
+  that was never displayed.
+- Storing `identification.components`. Large, low-signal, and the individual
+  entropy sources are not something this app reasons about.
+- Redacting the stored event. This is a single-owner demo, the data is the
+  owner's own, and Fingerprint publishes comparable detail in their public demo.
+  The one judgement call worth keeping in mind is that this view will be
+  screenshotted for the README, so pick a session whose location and IP you are
+  happy to publish rather than trying to sanitize after the fact.
