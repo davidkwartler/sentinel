@@ -278,17 +278,65 @@ changes the caching path for the live site.
 
 **Recommendation: custom subdomain first.** It is isolated — new records for a
 new name, nothing about how `sentinel.davidkwartler.com` is served changes, and
-nothing can break the running site. Two of the setup guide's caveats are already
-cleared: `metrics.davidkwartler.com` is unused, and the domain has no CAA
-records to conflict with.
+nothing can break the running site. One of the setup guide's caveats is already
+cleared: the domain has no CAA records to conflict with.
 
-Name it neutrally. The docs are explicit that `fp.` or `fingerprint.` defeats the
-purpose, since blocklists match on hostname. `metrics.` is their own suggestion.
+### Decided: `observatory.davidkwartler.com`
 
-The repo change either way is one line — the agent's `endpoints` (and
-`scriptUrlPattern`, if the script itself is also served through the subdomain) in
-`capturePro()`. Worth putting behind an env var rather than hardcoding, so local
-development keeps using the default endpoints.
+Unused, and clean against EasyPrivacy's 56,382 rules.
+
+Fingerprint's own guidance is to avoid `fp.` and `fingerprint.`, and their
+suggested alternative is `metrics.` — which is the single most-represented token
+in that list at 4,684 domains. `stats.` carries 1,269 and `analytics.` 1,048.
+Those entries are per-domain rather than wildcards, so none of them would block a
+new subdomain on day one; the reason to avoid them is that regex-based blockers
+(Pi-hole and similar) do match such tokens generically, and a hostname that
+announces itself as measurement is the kind a list maintainer adds by hand. The
+name is chosen for shelf life, not for day-one evasion.
+
+`observatory` reads as ordinary observability infrastructure to an engineer,
+which is both good camouflage and immediately legible. The astronomy sense also
+happens to describe the mechanism honestly: an observatory identifies distant
+things by their characteristics, without those things participating.
+
+Rejected for reasons worth not rediscovering: `sentry` collides with Sentry.io,
+`watchtower` with the Docker container updater, `watchman` with Facebook's file
+watcher, and `overlook` means *to fail to notice*. Generic infrastructure names
+(`api`, `edge`, `gateway`, `core`) were rejected because the subdomain must be
+dedicated to Fingerprint traffic and **cannot be edited after creation**, so
+spending one of those on it forecloses a name worth keeping.
+
+The hostname is deliberately invisible: it appears in devtools and nowhere else,
+never in a screenshot or the README. Nothing about the name needs to explain
+itself to a reader, which is why legibility to a blocklist mattered more than
+legibility to a person.
+
+### Remaining steps
+
+The code side is already done and merged behind env vars, so this is
+configuration only:
+
+1. Fingerprint dashboard, Settings > Subdomains > New subdomain:
+   `observatory.davidkwartler.com`. It cannot be edited afterwards.
+2. Add the CNAME and two A records it produces to Cloudflare DNS, **DNS-only
+   (grey cloud)** — this record must resolve straight to Fingerprint, not
+   through Cloudflare's edge. Validation expires after 14 days; propagation can
+   take up to 24 hours.
+3. Set both variables in Vercel production, then rebuild with
+   `vercel --prod --force` — `NEXT_PUBLIC_*` is inlined at build time and a
+   plain redeploy restores the cached build:
+
+   ```
+   NEXT_PUBLIC_FINGERPRINT_ENDPOINT="https://observatory.davidkwartler.com"
+   NEXT_PUBLIC_FINGERPRINT_SCRIPT_URL="https://observatory.davidkwartler.com/web/v<version>/<apiKey>/loader_v<loaderVersion>.js"
+   ```
+
+   Leave both unset in development; the default endpoints are fine there and a
+   subdomain would be one more thing to stand up.
+
+4. Confirm with an ad blocker enabled: the fingerprint toast should read Pro
+   rather than showing the "Pro unavailable" chip, and a new `Fingerprint` row
+   should land with `verification = 'verified'`.
 
 The Safari trade-off is worth understanding rather than dismissing: it interacts
 with `firstSeenAt` and `visitorFound`, recommended above as a top-four signal.
