@@ -1,3 +1,4 @@
+import type { Prisma } from "@/generated/prisma/client"
 import { NextRequest, NextResponse, after } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/db"
@@ -184,6 +185,8 @@ export async function POST(request: NextRequest) {
         detected: boolean
         eventId?: string
         downgraded?: boolean
+        ipDistanceKm?: number | null
+        ipDistanceUncertaintyKm?: number | null
       }
 
   let outcome: RecordOutcome | undefined
@@ -224,6 +227,25 @@ export async function POST(request: NextRequest) {
               screenRes,
               timezone,
               verification,
+              // All null unless verification resolved — none of these can be
+              // supplied by the browser, which is the point of storing them.
+              osVersion: verified?.details.osVersion ?? null,
+              browserVersion: verified?.details.browserVersion ?? null,
+              device: verified?.details.device ?? null,
+              ipTimezone: verified?.details.ipTimezone ?? null,
+              ipCity: verified?.details.ipCity ?? null,
+              ipCountry: verified?.details.ipCountry ?? null,
+              ipSubdivision: verified?.details.ipSubdivision ?? null,
+              ipLatitude: verified?.details.ipLatitude ?? null,
+              ipLongitude: verified?.details.ipLongitude ?? null,
+              ipAccuracyRadius: verified?.details.ipAccuracyRadius ?? null,
+              asn: verified?.details.asn ?? null,
+              asnName: verified?.details.asnName ?? null,
+              asnType: verified?.details.asnType ?? null,
+              firstSeenAt: verified?.details.firstSeenAt ?? null,
+              lastSeenAt: verified?.details.lastSeenAt ?? null,
+              suspectScore: signals?.suspectScore ?? null,
+              rawEvent: (verified?.rawEvent ?? null) as Prisma.InputJsonValue,
               isOriginal: !hasExisting,
             },
           })
@@ -239,6 +261,15 @@ export async function POST(request: NextRequest) {
             screenRes,
             timezone,
             verification,
+            ipLatitude: verified?.details.ipLatitude ?? null,
+            ipLongitude: verified?.details.ipLongitude ?? null,
+            ipAccuracyRadius: verified?.details.ipAccuracyRadius ?? null,
+            ipCity: verified?.details.ipCity ?? null,
+            ipSubdivision: verified?.details.ipSubdivision ?? null,
+            ipCountry: verified?.details.ipCountry ?? null,
+            asn: verified?.details.asn ?? null,
+            asnName: verified?.details.asnName ?? null,
+            asnType: verified?.details.asnType ?? null,
           })
 
           return { kind: "created", id: fingerprint.id, ...detection }
@@ -278,6 +309,10 @@ export async function POST(request: NextRequest) {
     const signalsForAnalysis =
       signals || detectionResult.downgraded || shapeAnomaly
         ? {
+            // Spread first so every enriched server signal carries through;
+            // the explicit fields below are the ones that must survive even
+            // when `signals` is null, which is exactly the downgrade case.
+            ...(signals ?? {}),
             incognito: signals?.incognito ?? null,
             vpn: signals?.vpn ?? null,
             bot: signals?.bot ?? null,
@@ -288,6 +323,9 @@ export async function POST(request: NextRequest) {
             serverVerified: signals !== null,
             downgraded: detectionResult.downgraded ?? null,
             shapeAnomaly,
+            ipDistanceKm: detectionResult.ipDistanceKm ?? null,
+            ipDistanceUncertaintyKm:
+              detectionResult.ipDistanceUncertaintyKm ?? null,
           }
         : undefined
     after(async () => {

@@ -22,6 +22,7 @@ vi.mock('@/lib/fingerprint-server', () => ({
 
 // prismaMock import triggers vi.mock('@/lib/db') via the __mocks__/db.ts auto-hoist
 import { prismaMock } from '@/lib/__mocks__/db'
+import { fingerprintRow, verifiedFingerprint } from '@/test/fixtures'
 import { POST } from '../route'
 import { auth } from '@/lib/auth'
 import { runDetection } from '@/lib/detection'
@@ -84,7 +85,7 @@ describe('POST /api/session/record', () => {
       userId: 'user-1',
       expires: new Date(Date.now() + 3600000),
     })
-    prismaMock.fingerprint.findUnique.mockResolvedValue({
+    prismaMock.fingerprint.findUnique.mockResolvedValue(fingerprintRow({
       id: 'fp-existing',
       sessionId: 'sess-1',
       userId: 'user-1',
@@ -99,7 +100,7 @@ describe('POST /api/session/record', () => {
       verification: 'unknown',
       isOriginal: true,
       createdAt: new Date(),
-    })
+    }))
 
     const request = makeRequest({ visitorId: 'fp-1', requestId: 'req-1' })
     const response = await POST(request)
@@ -132,7 +133,7 @@ describe('POST /api/session/record', () => {
     })
     prismaMock.fingerprint.findUnique.mockResolvedValue(null) // no duplicate
     prismaMock.fingerprint.findFirst.mockResolvedValue(null) // no existing = isOriginal
-    prismaMock.fingerprint.create.mockResolvedValue({
+    prismaMock.fingerprint.create.mockResolvedValue(fingerprintRow({
       id: 'fp-new',
       sessionId: 'sess-1',
       userId: 'user-1',
@@ -147,7 +148,7 @@ describe('POST /api/session/record', () => {
       verification: 'not_configured',
       isOriginal: true,
       createdAt: new Date(),
-    })
+    }))
     vi.mocked(runDetection).mockResolvedValue({ detected: false })
 
     const request = makeRequest({
@@ -192,8 +193,8 @@ describe('POST /api/session/record', () => {
       expires: new Date(Date.now() + 3600000),
     })
     prismaMock.fingerprint.findUnique.mockResolvedValue(null)
-    prismaMock.fingerprint.findFirst.mockResolvedValue({ id: 'fp-existing' } as any) // has existing
-    prismaMock.fingerprint.create.mockResolvedValue({
+    prismaMock.fingerprint.findFirst.mockResolvedValue(fingerprintRow({ id: 'fp-existing' }) as any) // has existing
+    prismaMock.fingerprint.create.mockResolvedValue(fingerprintRow({
       id: 'fp-second',
       sessionId: 'sess-1',
       userId: 'user-1',
@@ -208,7 +209,7 @@ describe('POST /api/session/record', () => {
       verification: 'not_configured',
       isOriginal: false,
       createdAt: new Date(),
-    })
+    }))
     vi.mocked(runDetection).mockResolvedValue({ detected: false })
 
     const request = makeRequest({ visitorId: 'fp-2', requestId: 'req-2' })
@@ -234,26 +235,15 @@ describe('POST /api/session/record', () => {
     prismaMock.fingerprint.findFirst.mockResolvedValue(null)
     vi.mocked(resolveFingerprint).mockResolvedValue({
       verification: 'verified',
-      verified: {
+      verified: verifiedFingerprint({
         visitorId: 'server-visitor',
         ip: '203.0.113.7',
         os: 'Mac OS X',
         browser: 'Chrome',
         userAgent: 'Mozilla/5.0',
-        clientMismatch: false,
-        signals: {
-          incognito: null,
-          vpn: null,
-          bot: null,
-          tampered: null,
-          replayed: null,
-          confidence: null,
-          stale: false,
-          serverVerified: true,
-        },
-      },
+      }),
     })
-    prismaMock.fingerprint.create.mockResolvedValue({
+    prismaMock.fingerprint.create.mockResolvedValue(fingerprintRow({
       id: 'fp-new',
       sessionId: 'sess-1',
       userId: 'user-1',
@@ -268,7 +258,7 @@ describe('POST /api/session/record', () => {
       verification: 'verified',
       isOriginal: true,
       createdAt: new Date(),
-    })
+    }))
     vi.mocked(runDetection).mockResolvedValue({ detected: false })
 
     // A client claiming "oss" no longer has any effect on whether verification
@@ -305,7 +295,7 @@ describe('POST /api/session/record', () => {
     })
     prismaMock.fingerprint.findUnique.mockResolvedValue(null)
     prismaMock.fingerprint.findFirst.mockResolvedValue(null)
-    prismaMock.fingerprint.create.mockResolvedValue({
+    prismaMock.fingerprint.create.mockResolvedValue(fingerprintRow({
       id: 'fp-new',
       sessionId: 'sess-1',
       userId: 'user-1',
@@ -320,7 +310,7 @@ describe('POST /api/session/record', () => {
       verification: 'not_configured',
       isOriginal: true,
       createdAt: new Date(),
-    })
+    }))
     vi.mocked(runDetection).mockResolvedValue({ detected: false })
 
     const request = makeRequest({
@@ -358,7 +348,7 @@ describe('POST /api/session/record', () => {
       })
       prismaMock.fingerprint.findUnique.mockResolvedValue(null)
       prismaMock.fingerprint.findFirst.mockResolvedValue(null)
-      prismaMock.fingerprint.create.mockResolvedValue({
+      prismaMock.fingerprint.create.mockResolvedValue(fingerprintRow({
         id: 'fp-new',
         sessionId: 'sess-1',
         userId: 'user-1',
@@ -373,7 +363,7 @@ describe('POST /api/session/record', () => {
         verification: 'not_configured',
         isOriginal: true,
         createdAt: new Date(),
-      })
+      }))
       vi.mocked(runDetection).mockResolvedValue({ detected: false })
 
       const response = await POST(
@@ -397,7 +387,7 @@ describe('POST /api/session/record', () => {
     })
     prismaMock.fingerprint.findUnique.mockResolvedValue(null)
     prismaMock.fingerprint.findFirst.mockResolvedValue(null)
-    prismaMock.fingerprint.create.mockResolvedValue({
+    prismaMock.fingerprint.create.mockResolvedValue(fingerprintRow({
       id: 'fp-new',
       sessionId: 'sess-1',
       userId: 'user-1',
@@ -412,7 +402,7 @@ describe('POST /api/session/record', () => {
       verification: 'not_configured',
       isOriginal: true,
       createdAt: new Date(),
-    })
+    }))
     vi.mocked(runDetection).mockResolvedValue({ detected: false })
 
     const response = await POST(
@@ -439,7 +429,7 @@ describe('POST /api/session/record', () => {
     })
     prismaMock.fingerprint.findUnique.mockResolvedValue(null)
     prismaMock.fingerprint.findFirst.mockResolvedValue(null)
-    prismaMock.fingerprint.create.mockResolvedValue({
+    prismaMock.fingerprint.create.mockResolvedValue(fingerprintRow({
       id: 'fp-new',
       sessionId: 'sess-1',
       userId: 'user-1',
@@ -454,7 +444,7 @@ describe('POST /api/session/record', () => {
       verification: 'not_configured',
       isOriginal: true,
       createdAt: new Date(),
-    })
+    }))
     vi.mocked(runDetection).mockResolvedValue({ detected: false })
 
     const request = makeRequest({
