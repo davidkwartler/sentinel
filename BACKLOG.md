@@ -2,15 +2,20 @@
 
 ## Next
 
-Ordered by priority. The first two are exploitable today by anyone holding a
-session cookie; the next three are detection gaps that occur on their own
-without an attacker; the last two are latent risk.
+Nothing open right now — see Done below for what shipped against the plans
+that used to live here (branch `backlog/all-items`).
 
-Each entry carries an implementation plan. The plans name real files and line
-numbers as of `03a4f8a` and are meant to be executable as written, but they are
-proposals — where a plan asserts something about a third-party payload shape or
-a framework behaviour it says so, and that assumption should be confirmed
-before it is relied on.
+## Not doing
+
+- Redirects from `/dashboard` and `/profile` — the old URLs were never shared.
+- Per-user server-side detection settings. Per-browser via localStorage is
+  fine for a demo, and it avoids a schema change.
+
+<!-- Archived implementation plans below, kept for reference — the entries
+     they document have moved to Done. -->
+
+<details>
+<summary>Archived implementation plans</summary>
 
 ### Client-supplied `mode` turns off server-side verification
 
@@ -538,6 +543,8 @@ curl -sI https://sentinel.davidkwartler.com/login | grep -i set-cookie
 must still show `auth_session=anonymous`, and `/sessions` must still 307 to
 `/login` when signed out.
 
+</details>
+
 ## Done
 
 - Unified page width — `/account` now uses the layout's `max-w-5xl` like
@@ -548,6 +555,43 @@ must still show `auth_session=anonymous`, and `/sessions` must still 307 to
   seeded data using RFC 5737 documentation IPs, uploaded as GitHub
   user-attachments, and are live in the three-column table at `README.md:11–29`.
   The stale `/dashboard` and `/profile` images are gone.
+- Server-side fingerprint verification no longer trusts a client-supplied
+  `mode` — `resolveFingerprint()` classifies verified/unresolved/unverifiable/
+  not_configured from the requestId's own shape, and a verified→unverifiable
+  downgrade on an established session now reaches Claude as evasion evidence.
+- `thresholdOverride` gated behind `NEXT_PUBLIC_THRESHOLD_PICKER_ENABLED`,
+  same pattern as the model picker — the session being monitored can no
+  longer set its own flag sensitivity in production.
+- `Fingerprint` and `DetectionEvent` now key to `User` with an optional,
+  `SetNull` session relation instead of cascading — a hijack detection no
+  longer gets deleted the moment the session it was observed on signs out.
+  DetectionEvent denormalizes the device components it renders/analyzes so it
+  can resolve its own contents without joining through Session.
+  **Needs `npx prisma db push` plus the backfill described in the archived
+  plan above before this is live against the database** — the schema and
+  application code are in, the migration itself was deliberately left for a
+  human to run against the production database rather than done here.
+- `/sessions` gained a "Detection history" section listing every
+  DetectionEvent for the user, newest first, with a muted "Session ended"
+  marker for orphaned events — otherwise a surviving orphaned event had
+  nowhere to render.
+- Fingerprint capture cache now keys to a hash of the session cookie instead
+  of a bare timestamp, so signing out and back in within the TTL window on
+  the same tab re-captures instead of silently reusing the prior session's
+  cache entry.
+- Pro fingerprinting's silent fallback to OSS (commonly an ad blocker) is now
+  surfaced: an amber "Pro unavailable" toast chip and a matching note on the
+  account page's Fingerprint source row, instead of nothing anywhere saying
+  Pro was attempted and failed.
+- Fingerprint components (`os`, `browser`, `screenRes`, `timezone`) are now
+  shape-validated, not just length-capped — a malformed value is normalized
+  away (not rejected) and surfaced to Claude as a `shapeAnomaly` signal.
+  **Assumption not yet confirmed**: the Pro OS/browser allowlist in
+  `settings.ts` is FingerprintJS's documented vocabulary, not captured from a
+  live Pro payload — reconcile against a real response before relying on it.
+- Deleted the dead root `proxy.ts` (Next never loaded it — the app lives
+  under `src/`) and renamed `src/middleware.ts` to `src/proxy.ts`, matching
+  Next 16's current convention. Verified against a live dev server.
 
 ## Not doing
 
