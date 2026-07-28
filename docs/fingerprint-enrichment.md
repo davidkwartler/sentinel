@@ -204,52 +204,51 @@ const fp = await prisma.fingerprint.findFirst({
 
 Staying on the page avoids the question entirely, which is why it is preferred.
 
-## Blocker: the server API key is empty in production
+## Server-side verification is live and classifying correctly
 
-`FINGERPRINT_SERVER_API_KEY` is present in the Vercel environment but its value
-is an empty string. Verified by pulling the production environment and measuring
-value lengths: `ANTHROPIC_API_KEY` is 110 characters, `AUTH_SECRET` is 46,
-`NEXT_PUBLIC_FINGERPRINT_API_KEY` is 20, and `FINGERPRINT_SERVER_API_KEY` is 0.
-The only other empty variables are Vercel's `VERCEL_GIT_*` build metadata, which
-are populated at build time by design.
+Confirmed in production against stored data, 2026-07-28:
 
-An empty string is falsy, so `resolveFingerprint()` returns `not_configured` and
-exits before any lookup on every request. Consequences, all currently true in
-production:
+| requestId | verification |
+| --- | --- |
+| `1785212713091.qSOYHK` | `verified` |
+| `fe4cabd0-0927-4b33-a356-…` | `unverifiable` |
+| `58d1cfc3-e0c1-4ee6-ba3b-…` | `unverifiable` |
 
-- `verifyFingerprint()` has never executed. No Smart Signal has ever been
-  computed, and no `SERVER-VERIFIED SIGNALS` block has ever reached Claude.
-- Every fingerprint is client-reported. The browser is the sole source of truth
-  for its own identity, which is the posture `fingerprint-server.ts` was written
-  to prevent.
-- Every `Fingerprint.verification` value will be `not_configured`, so the
-  downgrade signal can never fire — it requires a prior `verified` row.
-- The account page's Verification stat reads "Client only". That is a live probe,
-  so it has been accurate all along.
+That is the whole classifier working end to end. The Pro-issued request ID
+resolved against the Server API; the two UUID-shaped ones were recognized as
+locally generated and skipped without spending a lookup. No client claim was
+consulted for any of the three.
 
-The client-supplied `mode` bypass that headed the backlog was real, but in
-production it was bypassing a check that was not running anyway.
+So the enrichment work below is unblocked — the events exist and are resolving.
 
-**This spec is entirely blocked on that key.** Every enrichment below reads from
-a resolved identification event, and there are none. Setting a real key is step
-zero, and on its own it activates the existing Smart Signals path with no code
-change at all.
+**Do not use `vercel env pull` to audit whether a key is set.** Variables marked
+Sensitive in Vercel are write-only and pull as empty strings, which is
+indistinguishable from genuinely blank. An earlier revision of this document
+concluded from exactly that signal that `FINGERPRINT_SERVER_API_KEY` was empty
+and that server verification had never run. Both claims were wrong.
 
-```bash
-printf '%s' 'YOUR_SECRET_KEY' | vercel env add FINGERPRINT_SERVER_API_KEY production
-```
+Check behaviour instead. Either query `Fingerprint.verification` for a `verified`
+row, or sign in and request `GET /api/fingerprint/health`, which probes the API
+and reports `ok`, `not_configured`, or a named error code.
 
-Use `printf` rather than `echo`: `echo` appends a newline, which has already
-caused one silent failure in this project when a flag stored as `true\n` never
-matched `=== "true"`.
+One thing that generalizes beyond this project: `resolveFingerprint()` treats an
+empty key and an absent key identically, because `!process.env.X` is true for
+both. That is correct behaviour, but it means a blank value fails in exactly the
+same silent way as a missing one — worth remembering the next time this is
+diagnosed, given the `true\n` flag that silently failed `=== "true"` earlier in
+this project's history.
 
-Confirm afterwards by signing in and requesting `GET /api/fingerprint/health`,
-which should return `ok` rather than `not_configured`.
-
-## Second prerequisite: the agent has to reach Fingerprint at all
+## Remaining gap: the agent has to reach Fingerprint at all
 
 Independent of the server key. That one governs whether Sentinel can *resolve* an
-event; this governs whether one is ever *created*. Both have to be true.
+event; this governs whether one is ever *created*. Both have to be true, and
+only the first is currently confirmed.
+
+The stored data is suggestive: two `unverifiable` captures landed in the minutes
+immediately before the one `verified` capture, on the same OS and browser. That
+is the shape a Pro-to-OSS fallback leaves behind, though a manual mode toggle in
+`/account` would look identical, so it is consistent with blocking rather than
+evidence of it.
 
 The Pro agent's default endpoints are on Fingerprint-owned hostnames, which
 common blocklists carry. When they are blocked, `capturePro()` fails and the app
