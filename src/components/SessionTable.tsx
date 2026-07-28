@@ -64,7 +64,11 @@ export function SessionTable({
 
   // The flag threshold lives in localStorage (profile settings); read it after
   // mount so the score colours here match the rule the analysis actually used.
+  // Guarded by the same build flag the server checks — when it's off, the
+  // server always applies DEFAULT_FLAG_THRESHOLD, so reading a stale
+  // localStorage value here would report a flag line the server never applied.
   useEffect(() => {
+    if (process.env.NEXT_PUBLIC_THRESHOLD_PICKER_ENABLED !== "true") return
     const stored = Number(localStorage.getItem(THRESHOLD_KEY))
     if (localStorage.getItem(THRESHOLD_KEY) !== null && Number.isFinite(stored)) {
       setThreshold(clampThreshold(stored))

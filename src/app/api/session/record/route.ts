@@ -225,6 +225,15 @@ export async function POST(request: NextRequest) {
           process.env.NEXT_PUBLIC_MODEL_PICKER_ENABLED === "true"
         const modelOverride = allowModelOverride ? data.modelOverride : undefined
 
+        // The session being monitored should not set the sensitivity of the
+        // monitor — gated the same way as the model picker, behind its own
+        // flag so toggling one for a demo doesn't drag the other along.
+        const allowThresholdOverride =
+          process.env.NEXT_PUBLIC_THRESHOLD_PICKER_ENABLED === "true"
+        const thresholdOverride = allowThresholdOverride
+          ? data.thresholdOverride
+          : undefined
+
         // Analysis "off": skip Claude and flag on fingerprint mismatch alone —
         // this event only exists because the visitor ID diverged.
         if (modelOverride === ANALYSIS_OFF) {
@@ -242,7 +251,7 @@ export async function POST(request: NextRequest) {
         await analyzeDetectionEvent(
           eventId,
           modelOverride,
-          data.thresholdOverride,
+          thresholdOverride,
           signalsForAnalysis,
         )
       } catch (err) {

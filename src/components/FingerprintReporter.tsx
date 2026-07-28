@@ -143,9 +143,16 @@ export function FingerprintReporter() {
     }
 
     const modelOverride = localStorage.getItem(MODEL_KEY) || undefined
+    // The server ignores this unless NEXT_PUBLIC_THRESHOLD_PICKER_ENABLED is
+    // set, so don't bother reading it (or sending it) when the flag is off —
+    // keeps the payload honest about what it's actually asking for.
+    const thresholdPickerEnabled =
+      process.env.NEXT_PUBLIC_THRESHOLD_PICKER_ENABLED === "true"
     const storedThreshold = Number(localStorage.getItem(THRESHOLD_KEY))
     const thresholdOverride =
-      localStorage.getItem(THRESHOLD_KEY) !== null && Number.isFinite(storedThreshold)
+      thresholdPickerEnabled &&
+      localStorage.getItem(THRESHOLD_KEY) !== null &&
+      Number.isFinite(storedThreshold)
         ? clampThreshold(storedThreshold)
         : undefined
 
