@@ -52,6 +52,11 @@ browser, and screen instead.
 - Verification downgraded from established session = yes means this session started under \
 server-verified identification and this fingerprint reports one that cannot be verified — \
 treat this as evasion evidence and raise the score, not as a benign mode change.
+- Client-reported component failed its shape check = yes means a reported OS, browser, screen \
+resolution, or timezone did not look like a real device value and was replaced before reaching \
+this prompt — a client reporting components that match no real device is misreporting, which is \
+itself an indicator, though a weaker one than the signals above since it can also result from a \
+misconfigured or unusual browser.
 Only signals available on the current Fingerprint plan are listed. A signal that does not \
 appear was not measured — treat it as unknown, and do NOT read its absence as evidence \
 either way. Judge on the signals present plus the device characteristics.
@@ -112,7 +117,12 @@ function formatFingerprint(fp: {
     `  Browser: ${sanitize(fp.browser)}`,
     `  Screen Resolution: ${sanitize(fp.screenRes)}`,
     `  Timezone: ${sanitize(fp.timezone)}`,
-    `  User-Agent: ${sanitize(fp.userAgent, 400)}`,
+    // 400 chars was the largest interpolated field and, whenever server
+    // verification is unavailable, comes straight from the request header
+    // with no shape validation at all (unlike os/browser/screenRes/timezone,
+    // which are). OS and browser already carry the same information in a
+    // bounded, validated form, so this only needs to be short.
+    `  User-Agent: ${sanitize(fp.userAgent, 120)}`,
   ].join("\n")
 }
 

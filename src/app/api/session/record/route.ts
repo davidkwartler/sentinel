@@ -7,10 +7,19 @@ import { analyzeDetectionEvent } from "@/lib/claude"
 import {
   ANALYSIS_MODEL_IDS,
   ANALYSIS_OFF,
+  KNOWN_BROWSERS,
+  KNOWN_OS,
   MAX_FLAG_THRESHOLD,
   MIN_FLAG_THRESHOLD,
+  SCREEN_RES_PATTERN,
 } from "@/lib/settings"
 import { resolveFingerprint } from "@/lib/fingerprint-server"
+
+const KNOWN_OS_SET = new Set<string>(KNOWN_OS)
+const KNOWN_BROWSER_SET = new Set<string>(KNOWN_BROWSERS)
+// Built once at module scope, not per request — Intl.supportedValuesOf reads
+// the ICU timezone database, which doesn't change between requests.
+const VALID_TIMEZONES = new Set(Intl.supportedValuesOf("timeZone"))
 
 // Length caps double as prompt-injection hardening: these values are
 // interpolated into the Claude analysis prompt, so keep them short and
@@ -100,8 +109,6 @@ export async function POST(request: NextRequest) {
   }
 
   const visitorId = verified?.visitorId ?? data.visitorId
-  const os = verified?.os ?? data.os ?? null
-  const browser = verified?.browser ?? data.browser ?? null
   const signals = verified?.signals ?? null
 
   const ip =
@@ -110,6 +117,37 @@ export async function POST(request: NextRequest) {
     request.headers.get("x-real-ip") ??
     null
   const userAgent = verified?.userAgent ?? request.headers.get("user-agent") ?? null
+
+  // Shape validation, not just the length caps on fingerprintSchema above — a
+  // value failing its check is itself evidence (a client sending "Ignore
+  // previous instructions" as a screen resolution is already misbehaving), so
+  // it's normalized away rather than causing a 400 that would throw the
+  // signal out along with the request. Server-verified os/browser skip this:
+  // they're Fingerprint's own observation, not attacker-controlled, so only
+  // the client-reported fallback needs the check.
+  let shapeAnomaly = false
+
+  const rawScreenRes = data.screenRes ?? null
+  const screenRes =
+    rawScreenRes !== null && SCREEN_RES_PATTERN.test(rawScreenRes) ? rawScreenRes : null
+  if (rawScreenRes !== null && screenRes === null) shapeAnomaly = true
+
+  const rawTimezone = data.timezone ?? null
+  const timezone =
+    rawTimezone !== null && VALID_TIMEZONES.has(rawTimezone) ? rawTimezone : null
+  if (rawTimezone !== null && timezone === null) shapeAnomaly = true
+
+  let os = verified?.os ?? null
+  if (!verified?.os && data.os) {
+    os = KNOWN_OS_SET.has(data.os) ? data.os : "Unknown"
+    if (!KNOWN_OS_SET.has(data.os)) shapeAnomaly = true
+  }
+
+  let browser = verified?.browser ?? null
+  if (!verified?.browser && data.browser) {
+    browser = KNOWN_BROWSER_SET.has(data.browser) ? data.browser : "Unknown"
+    if (!KNOWN_BROWSER_SET.has(data.browser)) shapeAnomaly = true
+  }
 
   // Dedupe check, isOriginal decision, insert, and detection all commit atomically.
   // Serializable isolation prevents two concurrent first-loads (React strict mode,
@@ -161,8 +199,8 @@ export async function POST(request: NextRequest) {
               userAgent,
               os,
               browser,
-              screenRes: data.screenRes ?? null,
-              timezone: data.timezone ?? null,
+              screenRes,
+              timezone,
               verification,
               isOriginal: !hasExisting,
             },
@@ -176,8 +214,8 @@ export async function POST(request: NextRequest) {
             newUserAgent: userAgent,
             os,
             browser,
-            screenRes: data.screenRes ?? null,
-            timezone: data.timezone ?? null,
+            screenRes,
+            timezone,
             verification,
           })
 
@@ -208,9 +246,10 @@ export async function POST(request: NextRequest) {
     // signals is null whenever verification did not resolve — exactly the
     // downgrade case — so a plain `signals ?? undefined` would drop the flag
     // before it reaches the prompt. Construct a signals-shaped object with
-    // null fields when that's the only thing worth reporting.
+    // null fields when that's the only thing worth reporting. shapeAnomaly
+    // travels the same way.
     const signalsForAnalysis =
-      signals || detectionResult.downgraded
+      signals || detectionResult.downgraded || shapeAnomaly
         ? {
             incognito: signals?.incognito ?? null,
             vpn: signals?.vpn ?? null,
@@ -220,6 +259,7 @@ export async function POST(request: NextRequest) {
             confidence: signals?.confidence ?? null,
             stale: signals?.stale ?? false,
             downgraded: detectionResult.downgraded ?? null,
+            shapeAnomaly,
           }
         : undefined
     after(async () => {
