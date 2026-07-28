@@ -472,6 +472,12 @@ export async function verifyFingerprint(
     },
     rawEvent: stripComponents(event),
     signals: {
+      // Dormant: `incognito` is not on the current plan. Confirmed against a
+      // live event (2026-07-29), which carried nineteen products with no
+      // `incognito` key at all — so this always resolves null and formatSignals
+      // omits the line entirely. Kept because the mapping costs nothing and the
+      // signal returns the moment the plan includes it; the system prompt's
+      // guidance was rewritten to stop leaning on it in the meantime.
       incognito: products.incognito?.data?.result ?? null,
       vpn: products.vpn?.data?.result ?? null,
       bot: products.botd?.data?.bot?.result

@@ -271,15 +271,35 @@ one to qualify for.
 There is a catch. `sentinel.davidkwartler.com` currently resolves to Vercel's own
 addresses (`216.198.79.65`, `64.29.17.65`) rather than Cloudflare's, so that
 record is DNS-only — grey cloud. A Cloudflare Worker cannot intercept traffic
-that never passes through Cloudflare's edge, so the integration requires
-proxying the hostname first. That puts Cloudflare in front of Vercel
-permanently, needs SSL mode on Full (strict) to avoid a redirect loop, and
-changes the caching path for the live site.
+that never passes through Cloudflare's edge.
+
+An earlier draft of this section concluded that the integration therefore
+requires proxying `sentinel.davidkwartler.com` itself, putting Cloudflare in
+front of Vercel permanently. **That is wrong**, and the error is worth recording
+rather than quietly deleting, because it made the Cloudflare row look more
+expensive than it is. Fingerprint's guide documents a DNS-only path: host the
+worker on a *separate* subdomain that is proxied, and the main hostname is never
+touched. No Cloudflare in front of Vercel, no SSL mode change, no new caching
+path for the live site.
+
+What that path does cost is the advantage the table credits it with. On a
+proxied subdomain the requests go to `observatory.davidkwartler.com`, not
+`sentinel.davidkwartler.com`, so it is no longer same-origin — the column above
+describes the proxy-the-main-hostname variant, not the one we would actually
+run. Both options collapse to a subdomain, differing mainly in who terminates
+the request: Fingerprint's edge via A records, or a Worker on our own zone.
 
 **Recommendation: custom subdomain first.** It is isolated — new records for a
 new name, nothing about how `sentinel.davidkwartler.com` is served changes, and
-nothing can break the running site. One of the setup guide's caveats is already
-cleared: the domain has no CAA records to conflict with.
+nothing can break the running site. It needs no Workers account and no route
+configuration, and the setup is three DNS records against a Worker plus routes
+plus a proxied record. One of the setup guide's caveats is already cleared: the
+domain has no CAA records to conflict with.
+
+The Cloudflare route stays the upgrade path, and the Safari cookie cap below is
+the reason it might eventually be worth taking — a Worker on our own zone is not
+a CNAME to a third party, which is what ITP's heuristic keys on. Unverified, and
+it would need testing before it justified the move.
 
 ### Decided: `observatory.davidkwartler.com`
 
@@ -311,10 +331,11 @@ never in a screenshot or the README. Nothing about the name needs to explain
 itself to a reader, which is why legibility to a blocklist mattered more than
 legibility to a person.
 
-### Remaining steps
+### Setup, completed 2026-07-28
 
-The code side is already done and merged behind env vars, so this is
-configuration only:
+Steps 1–3 are done and verified; step 4 is the standing check. Kept as a record
+of what was actually run, and see the note after step 4 for the one part that
+was surprising.
 
 1. Fingerprint dashboard, Settings > Subdomains > New subdomain:
    `observatory.davidkwartler.com`. It cannot be edited afterwards.
@@ -337,6 +358,36 @@ configuration only:
 4. Confirm with an ad blocker enabled: the fingerprint toast should read Pro
    rather than showing the "Pro unavailable" chip, and a new `Fingerprint` row
    should land with `verification = 'verified'`.
+
+**Expect a 403 between steps 2 and 3.** Once the records resolve, and before
+Fingerprint finishes provisioning the certificate, `observatory` returns
+Cloudflare **Error 1000, "DNS points to prohibited IP"**. The reason is that the
+A records Fingerprint issues are themselves Cloudflare addresses
+(`162.159.141.170`, `172.66.1.166`), and until Fingerprint's Cloudflare for SaaS
+hostname goes active, the request falls through to our own zone — which is on
+Cloudflare and refuses to serve a record pointing at Cloudflare IPs. It is not a
+misconfiguration and the grey-cloud setting is not the cause; both were verified
+correct while the error was still showing.
+
+Distinguish it by certificate. During provisioning the hostname serves this
+zone's Universal SSL wildcard:
+
+```
+subject=CN=davidkwartler.com   SAN: davidkwartler.com, *.davidkwartler.com
+```
+
+When it clears, the subject becomes `CN=observatory.davidkwartler.com` and the
+403 goes with it. In this setup that took minutes, not the documented 24 hours.
+
+**Verifying it is actually in use.** The database cannot tell you. A row landing
+with `verification = 'verified'` proves the Pro path worked, but the endpoint
+fallback added alongside this change (`[observatory, defaultEndpoint]`) means a
+silent fall back to Fingerprint's own endpoints produces an identical row. Only
+the browser can answer it — check that both the loader `GET` and the
+identification `POST` go to `observatory.davidkwartler.com`, and that no
+`fpnpmcdn.net` or `api.fpjs.io` request appears beside them. The two are
+controlled by different variables (`SCRIPT_URL` and `ENDPOINT`) and fail
+independently, so confirming one says nothing about the other.
 
 The Safari trade-off is worth understanding rather than dismissing: it interacts
 with `firstSeenAt` and `visitorFound`, recommended above as a top-four signal.
@@ -362,25 +413,45 @@ live capture from `/products` in production.
 | `ipBlocklist` | yes | `email_spam`, `attack_source`, `tor_node` |
 | `suspectScore` | yes | 0 on this event |
 | `highActivity` | yes | boolean |
-| `incognito` | **absent** | see below — the app already depends on this |
-| `developerTools`, `locationSpoofing`, `mitmAttack`, `privacySettings`, `rawDeviceAttributes`, `remoteControl`, `virtualMachine`, `tor` | absent | web-relevant, not returned |
-| `clonedApp`, `emulator`, `factoryReset`, `frida`, `jailbroken`, `rootApps`, `proximity` | absent | mobile-only, not applicable to the JS agent |
+| `incognito` | **absent** | confirmed absent — see below |
+| `tor`, `mitmAttack`, `locationSpoofing` | **yes** | present and unread — see below |
+| `developerTools`, `privacySettings`, `rawDeviceAttributes`, `remoteControl`, `virtualMachine` | absent | web-relevant, not returned |
+| `clonedApp`, `emulator`, `factoryReset`, `frida`, `rootApps` | returned | mobile-only semantics; present in the payload but meaningless for the JS agent |
+| `proximity` | empty | key present, no data |
 
 Two things about that table matter more than the rest.
 
-**`incognito` is absent, and the prompt leans on it heavily.** The system prompt
-tells Claude that incognito "largely explains a changed visitor ID on an
-otherwise identical device — lower the score substantially," and lists incognito
-first among false positives to watch for. It is the single most useful
-false-positive discriminator this app has, and it may not be on the plan. Every
-other boolean in the sample came back explicitly `false` rather than being
-omitted, so absence here is probably real rather than a payload-shape artifact —
-but confirm before acting on it. If it genuinely is unavailable, that reshapes
-the prompt more than any addition below.
+**`incognito` is absent — confirmed, and the prompt has been corrected.**
+Re-checked on 2026-07-29 against a stored `rawEvent` from a live Server API
+capture, not the dashboard sample: nineteen product keys, no `incognito` among
+them. So it is a plan limit, not a payload-shape artifact.
 
-**The absent list is mostly not a plan limit.** Seven of those products only
-exist for mobile SDKs; the JS agent would never return them at any tier. Do not
-build UI or prompt lines for them.
+The mapping in `verifyFingerprint` is harmless — it resolves null and
+`formatSignals` omits the line, so nothing false reaches the model. The problem
+was in `claude.ts`, which carried a worked calibration example whose reasoning
+read "consistent with incognito or storage reset on the same device." That
+taught the model to explain away a changed visitor ID using evidence it can
+never receive, and the direction of that error is under-flagging — treating a
+real hijack as benign private browsing, which is the worse failure for a hijack
+detector. The example and the surrounding guidance now describe the observable
+pattern (identical characteristics, nothing else indicating a second device)
+without naming a cause this plan cannot measure.
+
+**Three web-relevant products are present and unread.** The earlier table listed
+`tor`, `mitmAttack`, and `locationSpoofing` as absent; that came from the
+dashboard/webhook sample, and the Server API disagrees. All three returned
+`{"result": false}` on the live event.
+
+`locationSpoofing` is the one that matters most, because the impossible-travel
+comparison now shipped is built entirely on IP geolocation and has no way to
+know the location is being faked. Reading the coordinates while discarding the
+product that flags them as spoofed repeats, in miniature, the gap this whole
+document was written to close.
+
+**Mobile products are returned, not withheld.** `clonedApp`, `emulator`,
+`factoryReset`, `frida`, and `rootApps` all appear in the payload. They carry no
+meaning for a JS agent, so continue to ignore them — but the reason is
+semantics, not availability.
 
 ### The sample is in the wrong shape
 
