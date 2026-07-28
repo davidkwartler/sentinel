@@ -38,11 +38,18 @@ export interface DetectionInput {
   browser?: string | null
   screenRes?: string | null
   timezone?: string | null
+  verification?: string
 }
 
 export interface DetectionResult {
   detected: boolean
   eventId?: string
+  /**
+   * The original fingerprint that established this session was server-verified
+   * and this one is not — evasion evidence, not necessarily a benign mode
+   * change (a user can legitimately switch Pro to OSS from /account).
+   */
+  downgraded?: boolean
 }
 
 /**
@@ -87,5 +94,8 @@ export async function runDetection(
     },
   })
 
-  return { detected: true, eventId: event.id }
+  const downgraded =
+    original.verification === "verified" && params.verification !== "verified"
+
+  return { detected: true, eventId: event.id, downgraded }
 }

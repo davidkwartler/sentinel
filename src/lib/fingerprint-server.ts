@@ -33,6 +33,17 @@ export interface FingerprintSignals {
   confidence: number | null
   /** Event was older than the replay window when we looked it up. */
   stale: boolean
+  /**
+   * This session established under server-verified identification and this
+   * fingerprint reports one that cannot be verified — evasion evidence, not a
+   * benign mode change. Null when there is no prior verification to compare.
+   */
+  downgraded?: boolean | null
+  /**
+   * A client-reported component (screen resolution, timezone, OS, browser)
+   * failed its shape check and was normalized away. Null when nothing to report.
+   */
+  shapeAnomaly?: boolean | null
 }
 
 // Fingerprint's own guidance: an identification event older than two minutes
@@ -148,6 +159,38 @@ interface ClientClaims {
   browser?: string | null
 }
 
+// Pro requestIds are issued by Fingerprint; OSS ones are crypto.randomUUID()
+// output, so a canonical UUID is self-evidently unresolvable — sending one
+// to dodge a lookup lands in the weaker "unverifiable" state, not a skip.
+const UUID_SHAPE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+export type Verification = "verified" | "unresolved" | "unverifiable" | "not_configured"
+
+export interface ResolvedFingerprint {
+  verification: Verification
+  verified: VerifiedFingerprint | null
+}
+
+/**
+ * Decide verification status server-side, from the data rather than from a
+ * client-supplied flag. A request carrying a UUID-shaped requestId cannot be
+ * Pro-issued, so it is classified `unverifiable` without spending an API call.
+ * Anything else attempts `verifyFingerprint`.
+ */
+export async function resolveFingerprint(
+  requestId: string,
+  claims: ClientClaims,
+): Promise<ResolvedFingerprint> {
+  if (!process.env.FINGERPRINT_SERVER_API_KEY) {
+    return { verification: "not_configured", verified: null }
+  }
+  if (UUID_SHAPE.test(requestId)) {
+    return { verification: "unverifiable", verified: null }
+  }
+  const verified = await verifyFingerprint(requestId, claims)
+  return { verification: verified ? "verified" : "unresolved", verified }
+}
+
 /**
  * Look up an identification event by requestId and return what Fingerprint
  * actually observed.
@@ -231,6 +274,8 @@ export function formatSignals(signals: FingerprintSignals): string {
   add("Bot detected", signals.bot)
   add("Browser tampering / anti-detect browser", signals.tampered)
   add("Request ID replayed", signals.replayed)
+  add("Verification downgraded from established session", signals.downgraded ?? null)
+  add("Client-reported component failed its shape check", signals.shapeAnomaly ?? null)
   if (signals.confidence !== null) {
     lines.push(`  Identification confidence: ${signals.confidence}`)
   }

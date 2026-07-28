@@ -24,6 +24,7 @@ vi.mock('@fingerprintjs/fingerprintjs-pro-server-api', () => ({
 
 import {
   verifyFingerprint,
+  resolveFingerprint,
   formatSignals,
   checkServerApiHealth,
   getCachedServerApiHealth,
@@ -143,6 +144,53 @@ describe('verifyFingerprint', () => {
     const result = await verifyFingerprint('req-1', { visitorId: 'client' })
 
     expect(result).toBeNull()
+  })
+})
+
+describe('resolveFingerprint', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    process.env.FINGERPRINT_SERVER_API_KEY = 'secret'
+  })
+
+  afterEach(() => {
+    delete process.env.FINGERPRINT_SERVER_API_KEY
+  })
+
+  it('classifies not_configured when no server key is set, without calling the API', async () => {
+    delete process.env.FINGERPRINT_SERVER_API_KEY
+
+    const result = await resolveFingerprint('req-1', { visitorId: 'client' })
+
+    expect(result).toEqual({ verification: 'not_configured', verified: null })
+    expect(mockGetEvent).not.toHaveBeenCalled()
+  })
+
+  it('classifies unverifiable for a UUID-shaped requestId, without calling the API', async () => {
+    const result = await resolveFingerprint(
+      '123e4567-e89b-12d3-a456-426614174000',
+      { visitorId: 'client' },
+    )
+
+    expect(result).toEqual({ verification: 'unverifiable', verified: null })
+    expect(mockGetEvent).not.toHaveBeenCalled()
+  })
+
+  it('classifies verified when the lookup succeeds for a non-UUID requestId', async () => {
+    mockGetEvent.mockResolvedValue(eventFixture())
+
+    const result = await resolveFingerprint('pro-request-id', { visitorId: 'server-visitor' })
+
+    expect(result.verification).toBe('verified')
+    expect(result.verified?.visitorId).toBe('server-visitor')
+  })
+
+  it('classifies unresolved when the lookup fails for a non-UUID requestId', async () => {
+    mockGetEvent.mockRejectedValue(new Error('network down'))
+
+    const result = await resolveFingerprint('pro-request-id', { visitorId: 'client' })
+
+    expect(result).toEqual({ verification: 'unresolved', verified: null })
   })
 })
 

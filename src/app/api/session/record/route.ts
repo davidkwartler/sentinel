@@ -10,12 +10,19 @@ import {
   MAX_FLAG_THRESHOLD,
   MIN_FLAG_THRESHOLD,
 } from "@/lib/settings"
-import { verifyFingerprint } from "@/lib/fingerprint-server"
+import { resolveFingerprint } from "@/lib/fingerprint-server"
 
 // Length caps double as prompt-injection hardening: these values are
 // interpolated into the Claude analysis prompt, so keep them short and
 // data-shaped. modelOverride is restricted to the known model allowlist so a
 // crafted request can't select an arbitrary (or expensive) model.
+//
+// Deliberately no `mode` field: whether a requestId is verifiable is decided
+// server-side in resolveFingerprint() from the requestId's own shape, not from
+// a client-supplied claim — a client asking to skip verification is the one
+// case verification exists to catch. z.object strips unknown keys, so a client
+// still sending `mode` keeps working; it's read off the raw body below, for
+// logging only.
 const fingerprintSchema = z.object({
   visitorId: z.string().min(1).max(128),
   requestId: z.string().min(1).max(128),
@@ -30,9 +37,6 @@ const fingerprintSchema = z.object({
     .min(MIN_FLAG_THRESHOLD)
     .max(MAX_FLAG_THRESHOLD)
     .optional(),
-  // Only Pro requestIds are resolvable against Fingerprint's server API; OSS
-  // mode generates a local UUID, so verification is skipped for it.
-  mode: z.enum(["pro", "oss"]).optional(),
 })
 
 // Each mismatched fingerprint triggers a Claude call, so an authenticated
@@ -70,15 +74,27 @@ export async function POST(request: NextRequest) {
   const data = parsed.data
 
   // Ask Fingerprint's server API what it actually observed for this requestId,
-  // and prefer that over anything the client told us about itself. Returns null
-  // when no server key is configured or the lookup fails, in which case we fall
-  // back to the client-reported values.
-  const verified =
-    data.mode === "oss" ? null : await verifyFingerprint(data.requestId, data)
+  // and prefer that over anything the client told us about itself. The client
+  // does not get a say in whether this happens — resolveFingerprint classifies
+  // from the requestId's own shape, not from a client-supplied mode flag.
+  const { verification, verified } = await resolveFingerprint(data.requestId, data)
 
   if (verified?.clientMismatch) {
     console.warn(
       "[fingerprint] client-reported components disagree with server for",
+      data.requestId,
+    )
+  }
+
+  // Logging only: a client claiming "pro" on a requestId we classified as
+  // unverifiable (UUID-shaped) is misreporting its own capture path.
+  const clientClaimedMode =
+    typeof body === "object" && body !== null && "mode" in body
+      ? (body as { mode?: unknown }).mode
+      : undefined
+  if (clientClaimedMode === "pro" && verification === "unverifiable") {
+    console.warn(
+      "[fingerprint] client claims pro mode but requestId is UUID-shaped for",
       data.requestId,
     )
   }
@@ -102,7 +118,13 @@ export async function POST(request: NextRequest) {
   type RecordOutcome =
     | { kind: "duplicate"; id: string }
     | { kind: "rate_limited" }
-    | { kind: "created"; id: string; detected: boolean; eventId?: string }
+    | {
+        kind: "created"
+        id: string
+        detected: boolean
+        eventId?: string
+        downgraded?: boolean
+      }
 
   let outcome: RecordOutcome | undefined
   for (let attempt = 0; attempt < 3; attempt++) {
@@ -140,6 +162,7 @@ export async function POST(request: NextRequest) {
               browser,
               screenRes: data.screenRes ?? null,
               timezone: data.timezone ?? null,
+              verification,
               isOriginal: !hasExisting,
             },
           })
@@ -152,6 +175,7 @@ export async function POST(request: NextRequest) {
             browser,
             screenRes: data.screenRes ?? null,
             timezone: data.timezone ?? null,
+            verification,
           })
 
           return { kind: "created", id: fingerprint.id, ...detection }
@@ -178,6 +202,23 @@ export async function POST(request: NextRequest) {
 
   if (detectionResult.detected && detectionResult.eventId) {
     const eventId = detectionResult.eventId
+    // signals is null whenever verification did not resolve — exactly the
+    // downgrade case — so a plain `signals ?? undefined` would drop the flag
+    // before it reaches the prompt. Construct a signals-shaped object with
+    // null fields when that's the only thing worth reporting.
+    const signalsForAnalysis =
+      signals || detectionResult.downgraded
+        ? {
+            incognito: signals?.incognito ?? null,
+            vpn: signals?.vpn ?? null,
+            bot: signals?.bot ?? null,
+            tampered: signals?.tampered ?? null,
+            replayed: signals?.replayed ?? null,
+            confidence: signals?.confidence ?? null,
+            stale: signals?.stale ?? false,
+            downgraded: detectionResult.downgraded ?? null,
+          }
+        : undefined
     after(async () => {
       try {
         const allowModelOverride =
@@ -202,7 +243,7 @@ export async function POST(request: NextRequest) {
           eventId,
           modelOverride,
           data.thresholdOverride,
-          signals ?? undefined,
+          signalsForAnalysis,
         )
       } catch (err) {
         // Fail closed: a broken analysis pipeline must not let a suspicious

@@ -14,11 +14,18 @@ vi.mock('@/lib/auth', () => ({ auth: vi.fn() }))
 vi.mock('@/lib/detection', () => ({ runDetection: vi.fn().mockResolvedValue({ detected: false }) }))
 vi.mock('@/lib/claude', () => ({ analyzeDetectionEvent: vi.fn() }))
 
+// Server-side verification is always attempted regardless of what the client
+// claims; default to "not_configured" (no key) so existing tests need no changes.
+vi.mock('@/lib/fingerprint-server', () => ({
+  resolveFingerprint: vi.fn().mockResolvedValue({ verification: 'not_configured', verified: null }),
+}))
+
 // prismaMock import triggers vi.mock('@/lib/db') via the __mocks__/db.ts auto-hoist
 import { prismaMock } from '@/lib/__mocks__/db'
 import { POST } from '../route'
 import { auth } from '@/lib/auth'
 import { runDetection } from '@/lib/detection'
+import { resolveFingerprint } from '@/lib/fingerprint-server'
 
 function makeRequest(body: unknown): NextRequest {
   return new NextRequest('http://localhost/api/session/record', {
@@ -81,6 +88,7 @@ describe('POST /api/session/record', () => {
       browser: null,
       screenRes: null,
       timezone: null,
+      verification: 'unknown',
       isOriginal: true,
       createdAt: new Date(),
     })
@@ -127,6 +135,7 @@ describe('POST /api/session/record', () => {
       browser: 'Chrome',
       screenRes: '1920x1080',
       timezone: 'America/New_York',
+      verification: 'not_configured',
       isOriginal: true,
       createdAt: new Date(),
     })
@@ -178,6 +187,7 @@ describe('POST /api/session/record', () => {
       browser: null,
       screenRes: null,
       timezone: null,
+      verification: 'not_configured',
       isOriginal: false,
       createdAt: new Date(),
     })
@@ -190,6 +200,77 @@ describe('POST /api/session/record', () => {
     expect(prismaMock.fingerprint.create).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({ isOriginal: false }),
+      }),
+    )
+  })
+
+  it('resolves server-side verification regardless of a client-supplied "mode", and persists it', async () => {
+    vi.mocked(auth).mockResolvedValue({ user: { id: 'user-1' }, expires: '' } as any)
+    prismaMock.session.findUnique.mockResolvedValue({
+      id: 'sess-1',
+      sessionToken: 'tok',
+      userId: 'user-1',
+      expires: new Date(Date.now() + 3600000),
+    })
+    prismaMock.fingerprint.findUnique.mockResolvedValue(null)
+    prismaMock.fingerprint.findFirst.mockResolvedValue(null)
+    vi.mocked(resolveFingerprint).mockResolvedValue({
+      verification: 'verified',
+      verified: {
+        visitorId: 'server-visitor',
+        ip: '203.0.113.7',
+        os: 'Mac OS X',
+        browser: 'Chrome',
+        userAgent: 'Mozilla/5.0',
+        clientMismatch: false,
+        signals: {
+          incognito: null,
+          vpn: null,
+          bot: null,
+          tampered: null,
+          replayed: null,
+          confidence: null,
+          stale: false,
+        },
+      },
+    })
+    prismaMock.fingerprint.create.mockResolvedValue({
+      id: 'fp-new',
+      sessionId: 'sess-1',
+      visitorId: 'server-visitor',
+      requestId: 'pro-req-id',
+      ip: '203.0.113.7',
+      userAgent: 'Mozilla/5.0',
+      os: 'Mac OS X',
+      browser: 'Chrome',
+      screenRes: '1920x1080',
+      timezone: 'America/New_York',
+      verification: 'verified',
+      isOriginal: true,
+      createdAt: new Date(),
+    })
+    vi.mocked(runDetection).mockResolvedValue({ detected: false })
+
+    // A client claiming "oss" no longer has any effect on whether verification
+    // is attempted — that decision lives entirely server-side now.
+    const request = makeRequest({
+      visitorId: 'client-claimed-visitor',
+      requestId: 'pro-req-id',
+      mode: 'oss',
+    })
+    const response = await POST(request)
+
+    expect(response.status).toBe(200)
+    expect(resolveFingerprint).toHaveBeenCalledWith(
+      'pro-req-id',
+      expect.objectContaining({ visitorId: 'client-claimed-visitor' }),
+    )
+    expect(prismaMock.fingerprint.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          verification: 'verified',
+          visitorId: 'server-visitor',
+        }),
       }),
     )
   })

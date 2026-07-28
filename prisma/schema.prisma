@@ -56,6 +56,9 @@ model Fingerprint {
   browser    String?
   screenRes  String?
   timezone   String?
+  // "verified" | "unresolved" | "unverifiable" | "not_configured" | "unknown".
+  // Existing rows default to "unknown" so historical data is never read as verified.
+  verification String @default("unknown")
   isOriginal Boolean  @default(false)
   createdAt  DateTime @default(now())
   session    Session  @relation(fields: [sessionId], references: [id], onDelete: Cascade)

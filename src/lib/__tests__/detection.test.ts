@@ -73,6 +73,7 @@ describe('runDetection', () => {
       browser: null,
       screenRes: null,
       timezone: null,
+      verification: 'unknown',
       isOriginal: true,
       createdAt: new Date(),
     })
@@ -97,6 +98,7 @@ describe('runDetection', () => {
       browser: 'Chrome',
       screenRes: '1920x1080',
       timezone: 'America/New_York',
+      verification: 'unknown',
       isOriginal: true,
       createdAt: new Date(),
     })
@@ -127,5 +129,85 @@ describe('runDetection', () => {
     expect(result.detected).toBe(true)
     expect(result.eventId).toBe('event-1')
     expect(prismaMock.detectionEvent.create).toHaveBeenCalledOnce()
+  })
+
+  it('flags downgraded:true when the original was verified and the new one is not', async () => {
+    prismaMock.fingerprint.findFirst.mockResolvedValue({
+      id: 'fp-1',
+      visitorId: 'fp-original',
+      sessionId: 'sess-1',
+      requestId: 'req-1',
+      ip: '1.2.3.4',
+      userAgent: null,
+      os: 'Mac OS',
+      browser: 'Chrome',
+      screenRes: '1920x1080',
+      timezone: 'America/New_York',
+      verification: 'verified',
+      isOriginal: true,
+      createdAt: new Date(),
+    })
+    prismaMock.detectionEvent.create.mockResolvedValue({
+      id: 'event-2',
+      createdAt: new Date(),
+      sessionId: 'sess-1',
+      originalVisitorId: 'fp-original',
+      newVisitorId: 'fp-new',
+      originalIp: '1.2.3.4',
+      newIp: '9.9.9.9',
+      similarityScore: 0.0,
+      status: 'PENDING',
+      confidenceScore: null,
+      reasoning: null,
+    })
+
+    const result = await runDetection(prismaMock, {
+      sessionId: 'sess-1',
+      newVisitorId: 'fp-new',
+      newIp: '9.9.9.9',
+      verification: 'unverifiable',
+    })
+
+    expect(result.downgraded).toBe(true)
+  })
+
+  it('does not flag downgraded when the original was never verified', async () => {
+    prismaMock.fingerprint.findFirst.mockResolvedValue({
+      id: 'fp-1',
+      visitorId: 'fp-original',
+      sessionId: 'sess-1',
+      requestId: 'req-1',
+      ip: '1.2.3.4',
+      userAgent: null,
+      os: null,
+      browser: null,
+      screenRes: null,
+      timezone: null,
+      verification: 'not_configured',
+      isOriginal: true,
+      createdAt: new Date(),
+    })
+    prismaMock.detectionEvent.create.mockResolvedValue({
+      id: 'event-3',
+      createdAt: new Date(),
+      sessionId: 'sess-1',
+      originalVisitorId: 'fp-original',
+      newVisitorId: 'fp-new',
+      originalIp: '1.2.3.4',
+      newIp: '9.9.9.9',
+      similarityScore: 0.0,
+      status: 'PENDING',
+      confidenceScore: null,
+      reasoning: null,
+    })
+
+    const result = await runDetection(prismaMock, {
+      sessionId: 'sess-1',
+      newVisitorId: 'fp-new',
+      newIp: '9.9.9.9',
+      verification: 'unverifiable',
+    })
+
+    expect(result.downgraded).toBe(false)
   })
 })

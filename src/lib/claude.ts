@@ -49,6 +49,9 @@ evidence of an attacker actively evading detection — raise the score sharply e
 device characteristics match, since matching characteristics may themselves be forged.
 - Low identification confidence means the visitor ID itself is unreliable — lean on OS, \
 browser, and screen instead.
+- Verification downgraded from established session = yes means this session started under \
+server-verified identification and this fingerprint reports one that cannot be verified — \
+treat this as evasion evidence and raise the score, not as a benign mode change.
 Only signals available on the current Fingerprint plan are listed. A signal that does not \
 appear was not measured — treat it as unknown, and do NOT read its absence as evidence \
 either way. Judge on the signals present plus the device characteristics.
