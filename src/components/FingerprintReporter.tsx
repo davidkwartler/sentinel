@@ -9,6 +9,7 @@ import {
   clampThreshold,
   FP_CACHE_KEY,
   FP_MODE_KEY,
+  FP_PRO_STATUS_KEY,
   MODEL_KEY,
   THRESHOLD_KEY,
 } from "@/lib/settings"
@@ -48,34 +49,56 @@ interface FingerprintPayload {
 // repeat captures within a tab session don't re-download it.
 let proClientPromise: ReturnType<typeof FingerprintJSPro.load> | null = null
 
-async function capturePro(modelOverride?: string): Promise<FingerprintPayload | null> {
+export type ProFailureReason = "no_key" | "load_failed" | "get_failed"
+
+type ProResult =
+  | { ok: true; payload: FingerprintPayload }
+  | { ok: false; reason: ProFailureReason }
+
+// Distinguishing load_failed from get_failed isn't decorative: load failing is
+// the ad-blocker case (Pro's agent endpoint is commonly blocked), while
+// get_failed is more likely a real API/network error. no_key is configuration,
+// not worth surfacing to a user — collapsing all three into `null` (the
+// previous behaviour) meant nothing anywhere said Pro was attempted and
+// failed, even though the mode badge silently switched to OSS underneath it.
+async function capturePro(modelOverride?: string): Promise<ProResult> {
   const apiKey = process.env.NEXT_PUBLIC_FINGERPRINT_API_KEY
   if (!apiKey) {
     console.warn("[Sentinel] NEXT_PUBLIC_FINGERPRINT_API_KEY not set")
-    return null
+    return { ok: false, reason: "no_key" }
+  }
+
+  let client: Awaited<ReturnType<typeof FingerprintJSPro.load>>
+  try {
+    proClientPromise ??= FingerprintJSPro.load({ apiKey })
+    client = await proClientPromise
+  } catch (err) {
+    console.warn("[Sentinel] Pro fingerprint agent failed to load:", err)
+    proClientPromise = null
+    return { ok: false, reason: "load_failed" }
   }
 
   try {
-    proClientPromise ??= FingerprintJSPro.load({ apiKey })
-    const client = await proClientPromise
     const result = (await client.get({
       extendedResult: true,
     })) as ExtendedGetResult
 
     return {
-      visitorId: result.visitorId,
-      requestId: result.requestId,
-      os: result.os,
-      browser: result.browserName,
-      screenRes: `${screen.width}x${screen.height}`,
-      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-      modelOverride,
-      mode: "pro",
+      ok: true,
+      payload: {
+        visitorId: result.visitorId,
+        requestId: result.requestId,
+        os: result.os,
+        browser: result.browserName,
+        screenRes: `${screen.width}x${screen.height}`,
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+        modelOverride,
+        mode: "pro",
+      },
     }
   } catch (err) {
-    console.warn("[Sentinel] Pro fingerprint failed:", err)
-    proClientPromise = null
-    return null
+    console.warn("[Sentinel] Pro fingerprint capture failed:", err)
+    return { ok: false, reason: "get_failed" }
   }
 }
 
@@ -154,6 +177,10 @@ export function FingerprintReporter({ sessionKey }: { sessionKey: string | null 
   const [status, setStatus] = useState<FpStatus>("idle")
   const [visible, setVisible] = useState(false)
   const [activeMode, setActiveMode] = useState<"pro" | "oss">("oss")
+  // "Pro selected but unavailable in this browser" is a different situation
+  // from "OSS because the user chose it" — the mode badge alone can't tell
+  // them apart, since it just reports whichever path actually ran.
+  const [proFailed, setProFailed] = useState(false)
 
   useEffect(() => {
     // Once a fingerprint is sent, skip re-capturing for the TTL window.
@@ -210,14 +237,35 @@ export function FingerprintReporter({ sessionKey }: { sessionKey: string | null 
         setStatus("capturing")
         setVisible(true)
 
-        let payload = fpMode === "pro" ? await capturePro(modelOverride) : null
-        if (!payload) {
-          if (fpMode === "pro") {
-            console.warn("[Sentinel] Pro fingerprint unavailable, falling back to OSS")
+        let payload: FingerprintPayload
+        if (fpMode === "pro") {
+          const result = await capturePro(modelOverride)
+          if (result.ok) {
+            payload = result.payload
+            sessionStorage.removeItem(FP_PRO_STATUS_KEY)
+            if (!cancelled) setProFailed(false)
+          } else {
+            console.warn("[Sentinel] Pro fingerprint unavailable, falling back to OSS:", result.reason)
+            // no_key is configuration, not a browser-side failure — nothing to
+            // surface to the user, and no reason for ProfileSettings to show a
+            // "Pro unavailable" note over what is really "Pro isn't set up".
+            if (result.reason === "no_key") {
+              sessionStorage.removeItem(FP_PRO_STATUS_KEY)
+            } else {
+              sessionStorage.setItem(FP_PRO_STATUS_KEY, result.reason)
+              if (!cancelled) setProFailed(true)
+            }
+            payload = await captureOss(modelOverride)
           }
+        } else {
           payload = await captureOss(modelOverride)
         }
         if (cancelled) return
+
+        // Reflect the path actually taken, not just the preference — a Pro
+        // preference that fell back to OSS must not leave the badge reading
+        // "Pro" for a capture that didn't happen.
+        setActiveMode(payload.mode ?? "oss")
 
         await submit({ ...payload, thresholdOverride })
       } catch (err) {
@@ -252,6 +300,18 @@ export function FingerprintReporter({ sessionKey }: { sessionKey: string | null 
     </span>
   )
 
+  // Left alone as the accurate report of the path that ran — this chip is the
+  // separate claim that Pro was the intended path and it failed, which the
+  // outline OSS badge alone doesn't say.
+  const proUnavailableChip = proFailed && (
+    <span
+      className="rounded border border-amber-300 bg-amber-50 px-1.5 py-0.5 font-medium text-amber-800"
+      title="FingerprintJS Pro failed to load or respond (often an ad blocker) — falling back to the open-source agent."
+    >
+      Pro unavailable
+    </span>
+  )
+
   return (
     // bottom-20 clears the footer (≈49px tall) when the page is scrolled to
     // the end — at bottom-4 the toast sat half on top of it.
@@ -261,6 +321,7 @@ export function FingerprintReporter({ sessionKey }: { sessionKey: string | null 
           <FingerprintIcon className="animate-pulse text-[#F35B22]" />
           <span className="text-gray-900">Registering fingerprint…</span>
           {modeBadge}
+          {proUnavailableChip}
         </>
       )}
       {status === "done" && (
@@ -268,6 +329,7 @@ export function FingerprintReporter({ sessionKey }: { sessionKey: string | null 
           <FingerprintIcon className="text-[#F35B22]" />
           <span className="text-gray-900">Fingerprint registered</span>
           {modeBadge}
+          {proUnavailableChip}
         </>
       )}
       {status === "cached" && (
