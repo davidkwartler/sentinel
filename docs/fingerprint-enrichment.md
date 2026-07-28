@@ -414,7 +414,8 @@ live capture from `/products` in production.
 | `suspectScore` | yes | 0 on this event |
 | `highActivity` | yes | boolean |
 | `incognito` | **absent** | confirmed absent — see below |
-| `tor`, `mitmAttack`, `locationSpoofing` | **yes** | present and unread — see below |
+| `tor` | **yes** | present and unread, IP-derived — worth adding, see below |
+| `mitmAttack`, `locationSpoofing` | yes | present but mobile-only semantics; never fire for browser traffic |
 | `developerTools`, `privacySettings`, `rawDeviceAttributes`, `remoteControl`, `virtualMachine` | absent | web-relevant, not returned |
 | `clonedApp`, `emulator`, `factoryReset`, `frida`, `rootApps` | returned | mobile-only semantics; present in the payload but meaningless for the JS agent |
 | `proximity` | empty | key present, no data |
@@ -437,16 +438,31 @@ detector. The example and the surrounding guidance now describe the observable
 pattern (identical characteristics, nothing else indicating a second device)
 without naming a cause this plan cannot measure.
 
-**Three web-relevant products are present and unread.** The earlier table listed
-`tor`, `mitmAttack`, and `locationSpoofing` as absent; that came from the
-dashboard/webhook sample, and the Server API disagrees. All three returned
-`{"result": false}` on the live event.
+**Three products are present and unread, but only one is worth reading.** The
+earlier table listed `tor`, `mitmAttack`, and `locationSpoofing` as absent; that
+came from the dashboard/webhook sample, and the Server API disagrees. All three
+returned `{"result": false}` on the live event.
 
-`locationSpoofing` is the one that matters most, because the impossible-travel
-comparison now shipped is built entirely on IP geolocation and has no way to
-know the location is being faked. Reading the coordinates while discarding the
-product that flags them as spoofed repeats, in miniature, the gap this whole
-document was written to close.
+Presence is not relevance, and the names mislead. Per the Server API schema:
+
+- `tor` — "true if the request IP address is a known tor exit node". IP-derived
+  and fully applicable to a browser. **Worth adding.** It is also the only
+  source: `ipBlocklist.details` carries `emailSpam` and `attackSource` and
+  nothing else, so the `tor_node` field an earlier draft of this document
+  attributed to it does not exist.
+- `locationSpoofing` — "the request came from a **mobile device** with location
+  spoofing enabled". This is device GPS spoofing on a mobile SDK, not IP
+  geolocation. It says nothing about whether the coordinates behind the
+  impossible-travel comparison are fabricated, and will not fire for browser
+  traffic. **Not applicable.**
+- `mitmAttack` — documented as "`false` … when the request originated from a
+  browser". **Not applicable.**
+
+Worth stating plainly because the reverse was briefly believed: the
+impossible-travel comparison has no Smart Signal backing it up. Its only defence
+against fabricated coordinates remains the accuracy radius reported beside every
+distance, plus the ASN and datacenter signals that would expose a hosting
+origin. That is a real limitation, not a gap this plan can close.
 
 **Mobile products are returned, not withheld.** `clonedApp`, `emulator`,
 `factoryReset`, `frida`, and `rootApps` all appear in the payload. They carry no
