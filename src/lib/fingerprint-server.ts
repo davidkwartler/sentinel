@@ -138,41 +138,6 @@ export interface FingerprintSignals {
   ipDistanceUncertaintyKm?: number | null
 }
 
-export interface FingerprintSignals {
-  incognito: boolean | null
-  vpn: boolean | null
-  bot: boolean | null
-  tampered: boolean | null
-  /** Fingerprint saw this exact requestId used more than once. */
-  replayed: boolean | null
-  /** Identification confidence, 0–1. */
-  confidence: number | null
-  /**
-   * Event was older than the replay window when we looked it up. Null when no
-   * identification event was resolved at all — there is no timestamp to judge,
-   * and reporting "not stale" from an absent lookup would assert a clean result
-   * the API never gave us.
-   */
-  stale: boolean | null
-  /**
-   * These values came from Fingerprint's Server API. False when the object
-   * exists only to carry the locally-derived flags below, which must not be
-   * presented to the model as server-observed evidence.
-   */
-  serverVerified: boolean
-  /**
-   * This session established under server-verified identification and this
-   * fingerprint reports one that cannot be verified — evasion evidence, not a
-   * benign mode change. Null when there is no prior verification to compare.
-   */
-  downgraded?: boolean | null
-  /**
-   * A client-reported component (screen resolution, timezone, OS, browser)
-   * failed its shape check and was normalized away. Null when nothing to report.
-   */
-  shapeAnomaly?: boolean | null
-}
-
 // Fingerprint's own guidance: an identification event older than two minutes
 // should be treated as a possible replay rather than a live page load.
 const MAX_EVENT_AGE_MS = 2 * 60 * 1000
@@ -292,10 +257,14 @@ function parseSeenAt(value: string | null | undefined): Date | null {
   return Number.isNaN(date.getTime()) ? null : date
 }
 
+// mlScore is optional because most products do not have one: per the Server API
+// schema only tampering and virtualMachine report it, so vpn and proxy are
+// called with two arguments rather than a trailing `undefined` that reads like
+// a field someone forgot to wire up.
 function scored(
   result: boolean | undefined,
   confidence: string | undefined,
-  mlScore: number | undefined,
+  mlScore?: number | undefined,
 ): ScoredSignal {
   return {
     result: result ?? null,
@@ -347,7 +316,9 @@ export function formatLocation(d: {
 }): string | null {
   const place = [d.ipCity, d.ipSubdivision, d.ipCountry].filter(Boolean).join(", ")
   if (!place) return null
-  return d.ipAccuracyRadius ? `${place} (±${d.ipAccuracyRadius}km)` : place
+  return d.ipAccuracyRadius !== null && d.ipAccuracyRadius !== undefined
+    ? `${place} (±${d.ipAccuracyRadius}km)`
+    : place
 }
 
 export function formatNetwork(d: {
@@ -509,15 +480,10 @@ export async function verifyFingerprint(
       tampered: products.tampering?.data?.result ?? null,
       replayed: identification.replayed ?? null,
       confidence: identification.confidence?.score ?? null,
-      vpnDetail: scored(
-        products.vpn?.data?.result,
-        products.vpn?.data?.confidence,
-        undefined,
-      ),
+      vpnDetail: scored(products.vpn?.data?.result, products.vpn?.data?.confidence),
       proxyDetail: scored(
         products.proxy?.data?.result,
         products.proxy?.data?.confidence,
-        undefined,
       ),
       tamperingDetail: scored(
         products.tampering?.data?.result,

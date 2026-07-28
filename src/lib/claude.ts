@@ -73,8 +73,10 @@ countries within an hour is strong evidence regardless of anything else.
 are producing. It is not authoritative and you should not simply echo it — but a large \
 disagreement is worth being explicit about in your reasoning.
 - Where a signal reports an ML score alongside its verdict, weigh the score, not just the \
-verdict. A VPN verdict of 'no' at ML score 0.04 is a clear pass; the same 'no' at 0.45 is \
-genuinely ambiguous and should temper any conclusion that rests on it.
+verdict. A tampering verdict of 'no' at ML score 0.04 is a clear pass; the same 'no' at 0.45 \
+is genuinely ambiguous and should temper any conclusion that rests on it. Signals that report \
+only a confidence level, with no score, carry no such nuance — read the verdict and the \
+confidence together and no further.
 Only signals available on the current Fingerprint plan are listed. A signal that does not \
 appear was not measured — treat it as unknown, and do NOT read its absence as evidence \
 either way. Judge on the signals present plus the device characteristics.

@@ -140,10 +140,18 @@ export async function runDetection(
     { lat: original.ipLatitude, lon: original.ipLongitude },
     { lat: params.ipLatitude ?? null, lon: params.ipLongitude ?? null },
   )
+  // Null unless BOTH radii are known. Defaulting a missing one to 0 would put
+  // "combined accuracy radius 0 km" in front of the model, which reads as
+  // perfect precision and turns any nonzero distance into travel. In practice
+  // the radius arrives in the same geolocation block as the coordinates, so
+  // this is a guard rather than a common path — but it is the one number whose
+  // whole job is to stop the model overclaiming.
+  const originalRadius = original.ipAccuracyRadius
+  const newRadius = params.ipAccuracyRadius ?? null
   const uncertainty =
-    distance === null
+    distance === null || originalRadius === null || newRadius === null
       ? null
-      : (original.ipAccuracyRadius ?? 0) + (params.ipAccuracyRadius ?? 0)
+      : originalRadius + newRadius
 
   return {
     detected: true,

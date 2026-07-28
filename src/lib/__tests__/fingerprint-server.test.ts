@@ -583,6 +583,19 @@ describe('formatDerivedSignals', () => {
     expect(out).toContain('not evidence of movement')
   })
 
+  it('reports the distance bare when the uncertainty is unknown', () => {
+    const out = formatDerivedSignals({
+      ...NO_SIGNALS,
+      ipDistanceKm: 12,
+      ipDistanceUncertaintyKm: null,
+    })
+
+    // No radius clause at all rather than one claiming 0 km of uncertainty,
+    // which would read as perfect precision.
+    expect(out).toContain('12 km')
+    expect(out).not.toContain('accuracy radius')
+  })
+
   it('renders only the flags this app worked out for itself', () => {
     const out = formatDerivedSignals({
       ...NO_SIGNALS,

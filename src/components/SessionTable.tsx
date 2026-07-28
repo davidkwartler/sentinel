@@ -243,8 +243,11 @@ export function SessionTable({
                       !isOrig && !!original && f[field] !== original[field]
 
                     return (
+                      // Keyed by id, not index: the details panel below holds
+                      // open/raw state, and index keys hand that state to a
+                      // different fingerprint the moment the list shifts.
                       <div
-                        key={i}
+                        key={f.id}
                         className={`rounded-md border p-3 text-xs ${
                           isOrig
                             ? "border-gray-200 bg-white"
@@ -577,49 +580,17 @@ function FullDetails({
 }) {
   const [open, setOpen] = useState(false)
   const [raw, setRaw] = useState<string | null>(null)
-  const [rawState, setRawState] = useState<"idle" | "loading" | "empty">("idle")
+  const [rawState, setRawState] = useState<
+    "idle" | "loading" | "empty" | "error"
+  >("idle")
 
-  const groups: { title: string; rows: [string, string | null][] }[] = [
-    {
-      title: "Location",
-      rows: [
-        [
-          "City",
-          [f.ipCity, f.ipSubdivision, f.ipCountry].filter(Boolean).join(", ") || null,
-        ],
-        // Named "accuracy" rather than shown as a bare number: it is the reason
-        // a small distance between two locations means nothing.
-        ["Accuracy", f.ipAccuracyRadius ? `±${f.ipAccuracyRadius} km` : null],
-        ["Timezone (from IP)", f.ipTimezone],
-      ],
-    },
-    {
-      title: "Network",
-      rows: [
-        ["Provider", f.asnName],
-        ["ASN", f.asn ? `AS${f.asn}` : null],
-        ["Type", f.asnType],
-      ],
-    },
-    {
-      title: "Device",
-      rows: [
-        ["OS version", f.osVersion],
-        ["Browser version", f.browserVersion],
-        ["Device", f.device],
-      ],
-    },
-    {
-      title: "History",
-      rows: [
-        ["First seen", f.firstSeenAt ? new Date(f.firstSeenAt).toISOString().slice(0, 10) : null],
-        ["Last seen", f.lastSeenAt ? new Date(f.lastSeenAt).toISOString().slice(0, 10) : null],
-        ["Suspect score", f.suspectScore !== null ? `${f.suspectScore}/100` : null],
-      ],
-    },
-  ]
+  const populated = DETAIL_GROUPS.map((group) => ({
+    title: group.title,
+    rows: group.rows
+      .map((row) => ({ row, value: row.render(f) }))
+      .filter((r) => r.value !== null),
+  })).filter((g) => g.rows.length > 0)
 
-  const populated = groups.filter((g) => g.rows.some(([, v]) => v))
   if (populated.length === 0) return null
 
   async function loadRaw() {
@@ -628,14 +599,22 @@ function FullDetails({
       return
     }
     setRawState("loading")
-    const { getRawEvent } = await import("@/app/(shop)/sessions/actions")
-    const event = await getRawEvent(f.id)
-    if (event === null) {
-      setRawState("empty")
-      return
+    try {
+      const { getRawEvent } = await import("@/app/(shop)/sessions/actions")
+      const event = await getRawEvent(f.id)
+      if (event === null) {
+        setRawState("empty")
+        return
+      }
+      setRaw(JSON.stringify(event, null, 2))
+      setRawState("idle")
+    } catch (err) {
+      // A rejected server action (expired auth, network blip) would otherwise
+      // leave the button reading "Loading…" forever with nothing in the UI to
+      // say the fetch died.
+      console.error("[Sentinel] raw event fetch failed:", err)
+      setRawState("error")
     }
-    setRaw(JSON.stringify(event, null, 2))
-    setRawState("idle")
   }
 
   return (
@@ -656,23 +635,25 @@ function FullDetails({
                 {group.title}
               </p>
               <div className="mt-0.5 space-y-0.5">
-                {group.rows
-                  .filter(([, v]) => v)
-                  .map(([label, value]) => {
-                    const originalValue = detailValue(original, label)
-                    return (
-                      <FpField
-                        key={label}
-                        label={label}
-                        value={value}
-                        diff={
-                          !f.isOriginal &&
-                          originalValue !== null &&
-                          originalValue !== value
-                        }
-                      />
-                    )
-                  })}
+                {group.rows.map(({ row, value }) => {
+                  // Same render function on both sides, so the comparison is
+                  // between two formatted values rather than between a formatted
+                  // one and whatever a second code path happened to produce.
+                  const originalValue =
+                    row.diffable && original ? row.render(original) : null
+                  return (
+                    <FpField
+                      key={row.label}
+                      label={row.label}
+                      value={value}
+                      diff={
+                        !f.isOriginal &&
+                        originalValue !== null &&
+                        originalValue !== value
+                      }
+                    />
+                  )
+                })}
               </div>
             </div>
           ))}
@@ -693,6 +674,11 @@ function FullDetails({
                 No server event stored for this fingerprint.
               </span>
             )}
+            {rawState === "error" && (
+              <span className="ml-2 text-[11px] text-amber-700">
+                Could not load the server event — try again.
+              </span>
+            )}
             {raw !== null && (
               <pre className="mt-2 max-h-80 overflow-auto rounded border border-gray-200 bg-white p-2 text-[10px] leading-relaxed text-gray-700">
                 {raw}
@@ -705,40 +691,87 @@ function FullDetails({
   )
 }
 
-// Recomputes the original's value for a label so the detail rows can diff the
-// same way the fields above them do.
-function detailValue(
-  original: FingerprintRow | undefined,
-  label: string,
-): string | null {
-  if (!original) return null
-  switch (label) {
-    case "City":
-      return (
-        [original.ipCity, original.ipSubdivision, original.ipCountry]
-          .filter(Boolean)
-          .join(", ") || null
-      )
-    case "Timezone (from IP)":
-      return original.ipTimezone
-    case "Provider":
-      return original.asnName
-    case "ASN":
-      return original.asn ? `AS${original.asn}` : null
-    case "Type":
-      return original.asnType
-    case "OS version":
-      return original.osVersion
-    case "Browser version":
-      return original.browserVersion
-    case "Device":
-      return original.device
-    default:
-      // Accuracy, first/last seen and suspect score legitimately differ between
-      // two captures of the same device, so diffing them would be noise.
-      return null
-  }
-}
+/**
+ * The rows of the detail panel, as data.
+ *
+ * `render` is applied to both the fingerprint being shown and the original, so
+ * the diff compares two values produced the same way — a label can be reworded
+ * without silently switching its row off. `diffable: false` marks the rows that
+ * legitimately differ between two captures of the same device (accuracy radius,
+ * first/last seen, suspect score), where highlighting would be noise.
+ */
+const DETAIL_GROUPS: {
+  title: string
+  rows: {
+    label: string
+    diffable: boolean
+    render: (f: FingerprintRow) => string | null
+  }[]
+}[] = [
+  {
+    title: "Location",
+    rows: [
+      {
+        label: "City",
+        diffable: true,
+        render: (f) =>
+          [f.ipCity, f.ipSubdivision, f.ipCountry].filter(Boolean).join(", ") ||
+          null,
+      },
+      {
+        // Named "accuracy" rather than shown as a bare number: it is the reason
+        // a small distance between two locations means nothing.
+        label: "Accuracy",
+        diffable: false,
+        render: (f) =>
+          f.ipAccuracyRadius !== null ? `±${f.ipAccuracyRadius} km` : null,
+      },
+      { label: "Timezone (from IP)", diffable: true, render: (f) => f.ipTimezone },
+    ],
+  },
+  {
+    title: "Network",
+    rows: [
+      { label: "Provider", diffable: true, render: (f) => f.asnName },
+      {
+        label: "ASN",
+        diffable: true,
+        render: (f) => (f.asn ? `AS${f.asn}` : null),
+      },
+      { label: "Type", diffable: true, render: (f) => f.asnType },
+    ],
+  },
+  {
+    title: "Device",
+    rows: [
+      { label: "OS version", diffable: true, render: (f) => f.osVersion },
+      { label: "Browser version", diffable: true, render: (f) => f.browserVersion },
+      { label: "Device", diffable: true, render: (f) => f.device },
+    ],
+  },
+  {
+    title: "History",
+    rows: [
+      {
+        label: "First seen",
+        diffable: false,
+        render: (f) =>
+          f.firstSeenAt ? new Date(f.firstSeenAt).toISOString().slice(0, 10) : null,
+      },
+      {
+        label: "Last seen",
+        diffable: false,
+        render: (f) =>
+          f.lastSeenAt ? new Date(f.lastSeenAt).toISOString().slice(0, 10) : null,
+      },
+      {
+        label: "Suspect score",
+        diffable: false,
+        render: (f) => (f.suspectScore !== null ? `${f.suspectScore}/100` : null),
+      },
+    ],
+  },
+]
 
 function FpField({
   label,

@@ -245,7 +245,14 @@ export async function POST(request: NextRequest) {
               firstSeenAt: verified?.details.firstSeenAt ?? null,
               lastSeenAt: verified?.details.lastSeenAt ?? null,
               suspectScore: signals?.suspectScore ?? null,
-              rawEvent: (verified?.rawEvent ?? null) as Prisma.InputJsonValue,
+              // Omitted rather than set to null: Prisma types a nullable Json
+              // column as `NullableJsonNullValueInput | InputJsonValue`, so
+              // passing null needs a cast that asserts something untrue. The
+              // column is nullable and defaults to NULL, so leaving it out says
+              // the same thing honestly.
+              ...(verified?.rawEvent
+                ? { rawEvent: verified.rawEvent as Prisma.InputJsonValue }
+                : {}),
               isOriginal: !hasExisting,
             },
           })
