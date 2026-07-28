@@ -244,37 +244,170 @@ export function SessionTable({
             )}
 
             {hasAnalysis && isAnalysisOpen && event && (
-              <div
-                className={`border-t px-4 py-4 sm:px-5 ${
-                  status === "FLAGGED"
-                    ? "border-red-100 bg-red-50"
-                    : status === "CLEAR"
-                      ? "border-green-100 bg-green-50"
-                      : "border-amber-100 bg-amber-50"
-                }`}
-              >
-                <p className="whitespace-pre-line text-sm leading-relaxed text-gray-700">
-                  {event.reasoning}
-                </p>
-                <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-black/5 pt-2 text-[11px] text-gray-500">
-                  <span>
-                    Score {event.confidenceScore ?? "—"}/100, flags at {threshold}
-                  </span>
-                  <span>
-                    Component similarity {(event.similarityScore * 100).toFixed(0)}%
-                  </span>
-                  <span>
-                    Analyzed <RelativeTime value={event.createdAt} />
-                  </span>
-                  {session.detectionEventCount > 1 && (
-                    <span>{session.detectionEventCount} events on this session</span>
-                  )}
-                </div>
-              </div>
+              <AnalysisPanel
+                event={event}
+                status={status}
+                threshold={threshold}
+                extraNote={
+                  session.detectionEventCount > 1
+                    ? `${session.detectionEventCount} events on this session`
+                    : undefined
+                }
+              />
             )}
           </div>
         )
       })}
+    </div>
+  )
+}
+
+// Shared by the per-session card above and DetectionHistoryList below, so the
+// reasoning block has one renderer regardless of whether the event is reached
+// through a live session or through detection history.
+function AnalysisPanel({
+  event,
+  status,
+  threshold,
+  extraNote,
+}: {
+  event: {
+    reasoning: string | null
+    confidenceScore: number | null
+    similarityScore: number
+    createdAt: Date | string
+  }
+  status: string
+  threshold: number
+  extraNote?: string
+}) {
+  return (
+    <div
+      className={`border-t px-4 py-4 sm:px-5 ${
+        status === "FLAGGED"
+          ? "border-red-100 bg-red-50"
+          : status === "CLEAR"
+            ? "border-green-100 bg-green-50"
+            : "border-amber-100 bg-amber-50"
+      }`}
+    >
+      <p className="whitespace-pre-line text-sm leading-relaxed text-gray-700">
+        {event.reasoning}
+      </p>
+      <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-black/5 pt-2 text-[11px] text-gray-500">
+        <span>
+          Score {event.confidenceScore ?? "—"}/100, flags at {threshold}
+        </span>
+        <span>
+          Component similarity {(event.similarityScore * 100).toFixed(0)}%
+        </span>
+        <span>
+          Analyzed <RelativeTime value={event.createdAt} />
+        </span>
+        {extraNote && <span>{extraNote}</span>}
+      </div>
+    </div>
+  )
+}
+
+type DetectionHistoryRow = {
+  id: string
+  status: string
+  confidenceScore: number | null
+  reasoning: string | null
+  similarityScore: number
+  createdAt: Date | string
+  sessionId: string | null
+  originalVisitorId: string
+  newVisitorId: string
+}
+
+/**
+ * Every DetectionEvent for the user, newest first — including ones whose
+ * session has since been deleted (sign-out). Fingerprint and DetectionEvent
+ * survive sign-out with sessionId set to null; without this list those rows
+ * exist in the database but appear nowhere, since the cards above only
+ * iterate live sessions.
+ */
+export function DetectionHistoryList({
+  events,
+}: {
+  events: DetectionHistoryRow[]
+}) {
+  const [expandedId, setExpandedId] = useState<string | null>(null)
+  const [threshold, setThreshold] = useState(DEFAULT_FLAG_THRESHOLD)
+
+  useEffect(() => {
+    if (process.env.NEXT_PUBLIC_THRESHOLD_PICKER_ENABLED !== "true") return
+    const stored = Number(localStorage.getItem(THRESHOLD_KEY))
+    if (localStorage.getItem(THRESHOLD_KEY) !== null && Number.isFinite(stored)) {
+      setThreshold(clampThreshold(stored))
+    }
+  }, [])
+
+  if (events.length === 0) return null
+
+  return (
+    <div className="mt-8">
+      <p className="mb-3 text-xs font-medium uppercase tracking-wide text-gray-500">
+        Detection history
+      </p>
+      <div className="space-y-2">
+        {events.map((event) => {
+          const hasAnalysis = !!event.reasoning
+          const isOpen = expandedId === event.id
+          const sessionEnded = event.sessionId === null
+
+          return (
+            <div
+              key={event.id}
+              className={`overflow-hidden rounded-lg border bg-white shadow-sm ${
+                event.status === "FLAGGED" ? "border-red-200" : "border-gray-200"
+              }`}
+            >
+              <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-5">
+                <div className="flex min-w-0 items-center gap-3">
+                  <StatusBadge status={event.status} />
+                  <div className="min-w-0">
+                    <p className="truncate font-mono text-xs text-gray-700">
+                      {event.originalVisitorId} → {event.newVisitorId}
+                    </p>
+                    <p className="mt-0.5 flex items-center gap-1.5 text-xs text-gray-500">
+                      {sessionEnded && (
+                        <span className="rounded bg-gray-100 px-1.5 py-0.5 text-[10px] font-medium text-gray-500">
+                          Session ended
+                        </span>
+                      )}
+                      <RelativeTime value={event.createdAt} />
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2">
+                  {event.confidenceScore != null && (
+                    <ConfidenceMeter score={event.confidenceScore} threshold={threshold} />
+                  )}
+                  {hasAnalysis && (
+                    <button
+                      onClick={() =>
+                        setExpandedId((p) => (p === event.id ? null : event.id))
+                      }
+                      aria-expanded={isOpen}
+                      className="rounded-md border border-gray-200 px-2.5 py-1 text-xs text-gray-600 transition-colors hover:bg-gray-50"
+                    >
+                      {isOpen ? "Hide" : "View"} analysis
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {hasAnalysis && isOpen && (
+                <AnalysisPanel event={event} status={event.status} threshold={threshold} />
+              )}
+            </div>
+          )
+        })}
+      </div>
     </div>
   )
 }

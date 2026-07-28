@@ -2,8 +2,12 @@ import { auth } from "@/lib/auth"
 import { redirect } from "next/navigation"
 import { cookies } from "next/headers"
 import { prisma } from "@/lib/db"
-import { SessionTable } from "@/components/SessionTable"
+import { SessionTable, DetectionHistoryList } from "@/components/SessionTable"
 import { PollingRefresher } from "./PollingRefresher"
+
+// Bounds the detection history payload; this is a monitoring view, not an
+// unbounded audit export.
+const DETECTION_HISTORY_LIMIT = 50
 
 export default async function DashboardPage() {
   const session = await auth()
@@ -60,6 +64,28 @@ export default async function DashboardPage() {
   const flagged = rows.filter((r) => r.detectionEvents[0]?.status === "FLAGGED").length
   const pending = rows.filter((r) => r.detectionEvents[0]?.status === "PENDING").length
 
+  // Every DetectionEvent for the user, independent of whether its session is
+  // still live. Fingerprint/DetectionEvent survive sign-out with sessionId set
+  // to null (see BACKLOG.md) — without this query, an orphaned event exists in
+  // the database but appears nowhere, since the cards above only iterate
+  // sessions with expires > now.
+  const detectionHistory = await prisma.detectionEvent.findMany({
+    where: { userId: session.user!.id! },
+    orderBy: { createdAt: "desc" },
+    take: DETECTION_HISTORY_LIMIT,
+    select: {
+      id: true,
+      status: true,
+      confidenceScore: true,
+      reasoning: true,
+      similarityScore: true,
+      createdAt: true,
+      sessionId: true,
+      originalVisitorId: true,
+      newVisitorId: true,
+    },
+  })
+
   return (
     <div>
       <PollingRefresher intervalMs={8000} />
@@ -73,6 +99,7 @@ export default async function DashboardPage() {
         sessions={rows}
         stats={{ total: rows.length, flagged, pending }}
       />
+      <DetectionHistoryList events={detectionHistory} />
     </div>
   )
 }
