@@ -4,15 +4,29 @@
 
 **Live demo:** https://sentinel.davidkwartler.com
 
-Sentinel is a Next.js application that detects when a stolen session cookie is used from a
-different device. When a fingerprint mismatch is detected, Claude analyzes the evidence and
-assigns a confidence score. Flagged sessions appear on the session monitoring page with
-Claude's full reasoning.
+Session hijacking is account takeover that skips the login: whoever copies a valid session cookie inherits an already-authenticated session, so passwords and MFA never come into play. Most identity controls run at sign-in, so nothing is watching afterward, and the activity looks like an ordinary logged-in customer until the damage shows up.
 
-<img width="1000" height="454" alt="Session hijack detected" src="https://github.com/user-attachments/assets/43a3a6eb-4661-4ec7-8f5d-be39b6086388" />
-<img width="1000" height="411" alt="Session hijack false positive" src="https://github.com/user-attachments/assets/a00a124c-d524-4b48-99db-23a29f415861" />
+Sentinel is a Next.js application that detects it. When a stolen cookie is used from a different device, the device fingerprint stops matching the one that established the session. Claude analyzes the mismatch and assigns a confidence score. Flagged sessions appear on the session monitoring page with the full reasoning.
 
-
+<div align="center">
+<table>
+  <tr>
+    <th width="33%" align="center">Sign in</th>
+    <th width="33%" align="center">Session monitoring</th>
+    <th width="33%" align="center">Detection settings</th>
+  </tr>
+  <tr>
+    <td align="center" valign="top">Google sign-in over a sample product storefront</td>
+    <td align="center" valign="top">Active sessions with fingerprints and detection outcomes</td>
+    <td align="center" valign="top">Toggle fingerprinting, GenAI model, and confidence score</td>
+  </tr>
+  <tr>
+    <td align="center"><img width="100%" alt="Sign-in modal over the sample product catalog, with a three-step summary of how detection works" src="https://github.com/user-attachments/assets/a0fa2f53-68a0-4c1f-86cb-8636a25993e9" /></td>
+    <td align="center"><img width="100%" alt="Sessions page showing one flagged session scored 96 of 100, with original and later fingerprints side by side" src="https://github.com/user-attachments/assets/fed2f6a5-b5a8-4a9b-8514-9406a4785df7" /></td>
+    <td align="center"><img width="100%" alt="Account page showing fingerprint source, analysis model, and flag threshold controls" src="https://github.com/user-attachments/assets/71d48b9a-af13-49fe-a562-611bcaf694cd" /></td>
+  </tr>
+</table>
+</div>
 
 ## Architecture
 
