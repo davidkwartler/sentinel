@@ -118,7 +118,39 @@ function FingerprintIcon({ className = "" }: { className?: string }) {
   )
 }
 
-export function FingerprintReporter() {
+interface FpCacheEntry {
+  /** Opaque hash of the session this capture was sent for — see (shop)/layout.tsx. */
+  key: string
+  at: number
+}
+
+/**
+ * A bare timestamp can't tell "still within the TTL" apart from "still within
+ * the TTL, but for a session that ended and a new one started in the same tab
+ * within the window" — sessionStorage isn't cleared by sign-out, so the old
+ * value survives into the next session and the reporter would skip capture
+ * for a session with no Fingerprint row at all. Malformed/legacy entries
+ * (including the old bare-timestamp shape) are treated as a miss, not a throw.
+ */
+function readFpCache(): FpCacheEntry | null {
+  const raw = sessionStorage.getItem(FP_CACHE_KEY)
+  if (!raw) return null
+  try {
+    const parsed = JSON.parse(raw)
+    if (parsed && typeof parsed.key === "string" && typeof parsed.at === "number") {
+      return parsed as FpCacheEntry
+    }
+    return null
+  } catch {
+    return null
+  }
+}
+
+function writeFpCache(key: string): void {
+  sessionStorage.setItem(FP_CACHE_KEY, JSON.stringify({ key, at: Date.now() }))
+}
+
+export function FingerprintReporter({ sessionKey }: { sessionKey: string | null }) {
   const [status, setStatus] = useState<FpStatus>("idle")
   const [visible, setVisible] = useState(false)
   const [activeMode, setActiveMode] = useState<"pro" | "oss">("oss")
@@ -133,9 +165,9 @@ export function FingerprintReporter() {
     const fpMode = (localStorage.getItem(FP_MODE_KEY) || (process.env.NEXT_PUBLIC_FINGERPRINT_API_KEY ? "pro" : "oss")) as "pro" | "oss"
     setActiveMode(fpMode)
 
-    const cached = sessionStorage.getItem(FP_CACHE_KEY)
+    const cached = readFpCache()
     const ttl = Number(process.env.NEXT_PUBLIC_FINGERPRINT_TTL_MS ?? 1_800_000)
-    if (cached && Date.now() - Number(cached) < ttl) {
+    if (cached && cached.key === sessionKey && Date.now() - cached.at < ttl) {
       setStatus("cached")
       setVisible(true)
       const timer = setTimeout(() => setVisible(false), 2000)
@@ -165,7 +197,7 @@ export function FingerprintReporter() {
         body: JSON.stringify(payload),
       })
       if (res.ok) {
-        sessionStorage.setItem(FP_CACHE_KEY, String(Date.now()))
+        if (sessionKey) writeFpCache(sessionKey)
         if (!cancelled) {
           setStatus("done")
           setTimeout(() => setVisible(false), 3000)
@@ -199,7 +231,10 @@ export function FingerprintReporter() {
     return () => {
       cancelled = true
     }
-  }, [])
+    // sessionKey changing means the session changed under this tab (sign out
+    // + back in within the TTL window) — re-run so the new session gets its
+    // own capture instead of reading the previous one's cache entry.
+  }, [sessionKey])
 
   if (!visible) return null
 

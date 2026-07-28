@@ -3,6 +3,7 @@
 import Link from "next/link"
 import { useEffect, useRef, useState } from "react"
 import { SessionsIcon, SignOutIcon, UserIcon } from "@/components/icons"
+import { FP_CACHE_KEY } from "@/lib/settings"
 
 // One size and color for every menu glyph; the shapes come from the shared
 // icon set so a destination looks the same here, in the footer, and in the nav.
@@ -124,6 +125,7 @@ export function AccountMenu({
             <button
               type="submit"
               role="menuitem"
+              onClick={() => sessionStorage.removeItem(FP_CACHE_KEY)}
               className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 hover:text-gray-900"
             >
               <SignOutIcon className={MENU_ICON} />
