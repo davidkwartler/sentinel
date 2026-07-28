@@ -22,8 +22,11 @@ export default async function AccountPage() {
           select: { expires: true, _count: { select: { fingerprints: true } } },
         })
       : null,
+    // Direct userId, not session: { userId } — a DetectionEvent survives its
+    // session being deleted (sign-out) with sessionId set to null, so joining
+    // through the session relation would silently drop orphaned events.
     prisma.detectionEvent.count({
-      where: { session: { userId }, status: "FLAGGED" },
+      where: { userId, status: "FLAGGED" },
     }),
     getCachedServerApiHealth(),
   ])

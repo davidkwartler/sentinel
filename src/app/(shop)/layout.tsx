@@ -1,3 +1,5 @@
+import { createHash } from "crypto"
+import { cookies } from "next/headers"
 import { auth, signOut } from "@/lib/auth"
 import { FingerprintReporter } from "@/components/FingerprintReporter"
 import { SiteHeader } from "@/components/SiteHeader"
@@ -8,6 +10,17 @@ export default async function ShopLayout({
   children: React.ReactNode
 }) {
   const session = await auth()
+
+  // A short opaque hash of the session cookie, not the cookie itself and not
+  // Session.id — this layout renders on every page, so deriving it here
+  // avoids an extra database query, and nothing token-shaped reaches the
+  // browser. FingerprintReporter uses it to detect "this is a different
+  // session than the one the cached capture was sent for" without needing to
+  // know what that session actually is.
+  const sessionToken = (await cookies()).get("auth_session")?.value
+  const sessionKey = sessionToken
+    ? createHash("sha256").update(sessionToken).digest("hex").slice(0, 16)
+    : null
 
   return (
     // flex-1 rather than min-h-screen: the root layout owns full-viewport
@@ -27,7 +40,7 @@ export default async function ShopLayout({
       <main id="main-content" className="mx-auto w-full max-w-5xl px-6 py-8">
         {children}
       </main>
-      {session && <FingerprintReporter />}
+      {session && <FingerprintReporter sessionKey={sessionKey} />}
     </div>
   )
 }

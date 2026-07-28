@@ -31,8 +31,30 @@ export interface FingerprintSignals {
   replayed: boolean | null
   /** Identification confidence, 0–1. */
   confidence: number | null
-  /** Event was older than the replay window when we looked it up. */
-  stale: boolean
+  /**
+   * Event was older than the replay window when we looked it up. Null when no
+   * identification event was resolved at all — there is no timestamp to judge,
+   * and reporting "not stale" from an absent lookup would assert a clean result
+   * the API never gave us.
+   */
+  stale: boolean | null
+  /**
+   * These values came from Fingerprint's Server API. False when the object
+   * exists only to carry the locally-derived flags below, which must not be
+   * presented to the model as server-observed evidence.
+   */
+  serverVerified: boolean
+  /**
+   * This session established under server-verified identification and this
+   * fingerprint reports one that cannot be verified — evasion evidence, not a
+   * benign mode change. Null when there is no prior verification to compare.
+   */
+  downgraded?: boolean | null
+  /**
+   * A client-reported component (screen resolution, timezone, OS, browser)
+   * failed its shape check and was normalized away. Null when nothing to report.
+   */
+  shapeAnomaly?: boolean | null
 }
 
 // Fingerprint's own guidance: an identification event older than two minutes
@@ -148,6 +170,44 @@ interface ClientClaims {
   browser?: string | null
 }
 
+// Pro requestIds are issued by Fingerprint; OSS ones are crypto.randomUUID()
+// output, so a canonical UUID is self-evidently unresolvable — sending one
+// to dodge a lookup lands in the weaker "unverifiable" state, not a skip.
+//
+// Confirmed against Fingerprint's Server API reference: request IDs are a Unix
+// millisecond timestamp, a period, and a base62 suffix (`1708102555327.NLOjmg`),
+// or a bare base62 string (`8nbmT18x79m54PQ0GvPq`). Neither form contains the
+// dashes this pattern requires, so live Pro traffic cannot be misclassified as
+// unverifiable. https://docs.fingerprint.com/reference/server-api-get-event
+const UUID_SHAPE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+export type Verification = "verified" | "unresolved" | "unverifiable" | "not_configured"
+
+export interface ResolvedFingerprint {
+  verification: Verification
+  verified: VerifiedFingerprint | null
+}
+
+/**
+ * Decide verification status server-side, from the data rather than from a
+ * client-supplied flag. A request carrying a UUID-shaped requestId cannot be
+ * Pro-issued, so it is classified `unverifiable` without spending an API call.
+ * Anything else attempts `verifyFingerprint`.
+ */
+export async function resolveFingerprint(
+  requestId: string,
+  claims: ClientClaims,
+): Promise<ResolvedFingerprint> {
+  if (!process.env.FINGERPRINT_SERVER_API_KEY) {
+    return { verification: "not_configured", verified: null }
+  }
+  if (UUID_SHAPE.test(requestId)) {
+    return { verification: "unverifiable", verified: null }
+  }
+  const verified = await verifyFingerprint(requestId, claims)
+  return { verification: verified ? "verified" : "unresolved", verified }
+}
+
 /**
  * Look up an identification event by requestId and return what Fingerprint
  * actually observed.
@@ -207,37 +267,63 @@ export async function verifyFingerprint(
       replayed: identification.replayed ?? null,
       confidence: identification.confidence?.score ?? null,
       stale: Number.isFinite(eventAge) && eventAge > MAX_EVENT_AGE_MS,
+      serverVerified: true,
     },
   }
 }
 
+function renderLines(
+  entries: [label: string, value: boolean | null | undefined][],
+): string[] {
+  return entries
+    .filter(([, value]) => value !== null && value !== undefined)
+    .map(([label, value]) => `  ${label}: ${value ? "yes" : "no"}`)
+}
+
 /**
- * Render signals for the Claude prompt. Server-observed, so safe to inline.
+ * Render the server-observed signals for the Claude prompt. Only these are
+ * safe to present under a "server-verified" heading — the locally-derived
+ * flags go through formatDerivedSignals so the model is never told that
+ * something we worked out ourselves came from Fingerprint's API.
  *
  * Smart Signals are plan-gated — on lower tiers most arrive as null. Emit only
  * the ones actually present rather than a wall of "unknown", which would spend
  * tokens telling the model nothing and invites hedging on absent evidence.
- * The staleness line is always present — it comes from the event timestamp, not
- * from a paid signal — so there is always at least one line to report.
+ * Staleness is derived from the event timestamp rather than a paid signal, so
+ * it is reported whenever an event was actually resolved — but it is null when
+ * no lookup happened, and printing "not stale" then would assert a clean result
+ * the API never gave us.
  */
 export function formatSignals(signals: FingerprintSignals): string {
-  const lines: string[] = []
-  const add = (label: string, value: boolean | null) => {
-    if (value !== null) lines.push(`  ${label}: ${value ? "yes" : "no"}`)
-  }
+  const lines = renderLines([
+    ["Incognito/private browsing", signals.incognito],
+    ["VPN detected", signals.vpn],
+    ["Bot detected", signals.bot],
+    ["Browser tampering / anti-detect browser", signals.tampered],
+    ["Request ID replayed", signals.replayed],
+  ])
 
-  add("Incognito/private browsing", signals.incognito)
-  add("VPN detected", signals.vpn)
-  add("Bot detected", signals.bot)
-  add("Browser tampering / anti-detect browser", signals.tampered)
-  add("Request ID replayed", signals.replayed)
   if (signals.confidence !== null) {
     lines.push(`  Identification confidence: ${signals.confidence}`)
   }
-  // Always meaningful: derived from the event timestamp, not a paid signal.
-  lines.push(
-    `  Event older than the 2-minute replay window: ${signals.stale ? "yes" : "no"}`,
-  )
+  if (signals.stale !== null) {
+    lines.push(
+      `  Event older than the 2-minute replay window: ${signals.stale ? "yes" : "no"}`,
+    )
+  }
 
   return lines.join("\n")
+}
+
+/**
+ * Render the signals this application worked out for itself, which are not
+ * observations from Fingerprint and must not be labelled as such. Returns an
+ * empty string when there is nothing to report, so the caller can omit the
+ * block entirely rather than emitting an empty heading.
+ */
+export function formatDerivedSignals(signals: FingerprintSignals): string {
+  return renderLines([
+    ["Verification downgraded from established session", signals.downgraded],
+    ["Client-reported component failed its shape check", signals.shapeAnomaly],
+  ]).join("\n")
 }

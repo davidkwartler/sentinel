@@ -14,11 +14,18 @@ vi.mock('@/lib/auth', () => ({ auth: vi.fn() }))
 vi.mock('@/lib/detection', () => ({ runDetection: vi.fn().mockResolvedValue({ detected: false }) }))
 vi.mock('@/lib/claude', () => ({ analyzeDetectionEvent: vi.fn() }))
 
+// Server-side verification is always attempted regardless of what the client
+// claims; default to "not_configured" (no key) so existing tests need no changes.
+vi.mock('@/lib/fingerprint-server', () => ({
+  resolveFingerprint: vi.fn().mockResolvedValue({ verification: 'not_configured', verified: null }),
+}))
+
 // prismaMock import triggers vi.mock('@/lib/db') via the __mocks__/db.ts auto-hoist
 import { prismaMock } from '@/lib/__mocks__/db'
 import { POST } from '../route'
 import { auth } from '@/lib/auth'
 import { runDetection } from '@/lib/detection'
+import { resolveFingerprint } from '@/lib/fingerprint-server'
 
 function makeRequest(body: unknown): NextRequest {
   return new NextRequest('http://localhost/api/session/record', {
@@ -32,6 +39,13 @@ describe('POST /api/session/record', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     prismaMock.$transaction.mockImplementation(async (fn: any) => fn(prismaMock))
+    // clearAllMocks resets call history but not a mockResolvedValue set by an
+    // earlier test — restore the default here so tests that don't care about
+    // verification aren't affected by whichever value the previous test left.
+    vi.mocked(resolveFingerprint).mockResolvedValue({
+      verification: 'not_configured',
+      verified: null,
+    })
   })
 
   it('returns 401 when unauthenticated (auth() returns null)', async () => {
@@ -73,6 +87,7 @@ describe('POST /api/session/record', () => {
     prismaMock.fingerprint.findUnique.mockResolvedValue({
       id: 'fp-existing',
       sessionId: 'sess-1',
+      userId: 'user-1',
       visitorId: 'fp-original',
       requestId: 'req-1',
       ip: null,
@@ -81,6 +96,7 @@ describe('POST /api/session/record', () => {
       browser: null,
       screenRes: null,
       timezone: null,
+      verification: 'unknown',
       isOriginal: true,
       createdAt: new Date(),
     })
@@ -119,6 +135,7 @@ describe('POST /api/session/record', () => {
     prismaMock.fingerprint.create.mockResolvedValue({
       id: 'fp-new',
       sessionId: 'sess-1',
+      userId: 'user-1',
       visitorId: 'fp-1',
       requestId: 'req-1',
       ip: null,
@@ -127,6 +144,7 @@ describe('POST /api/session/record', () => {
       browser: 'Chrome',
       screenRes: '1920x1080',
       timezone: 'America/New_York',
+      verification: 'not_configured',
       isOriginal: true,
       createdAt: new Date(),
     })
@@ -152,8 +170,16 @@ describe('POST /api/session/record', () => {
         data: expect.objectContaining({
           isOriginal: true,
           visitorId: 'fp-1',
+          userId: 'user-1',
         }),
       }),
+    )
+    // Fingerprint/DetectionEvent are keyed to the user independent of the
+    // session, so a sign-out (which deletes the Session row) doesn't cascade
+    // them away — see runDetection's userId param.
+    expect(runDetection).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ userId: 'user-1' }),
     )
   })
 
@@ -170,6 +196,7 @@ describe('POST /api/session/record', () => {
     prismaMock.fingerprint.create.mockResolvedValue({
       id: 'fp-second',
       sessionId: 'sess-1',
+      userId: 'user-1',
       visitorId: 'fp-2',
       requestId: 'req-2',
       ip: null,
@@ -178,6 +205,7 @@ describe('POST /api/session/record', () => {
       browser: null,
       screenRes: null,
       timezone: null,
+      verification: 'not_configured',
       isOriginal: false,
       createdAt: new Date(),
     })
@@ -190,6 +218,256 @@ describe('POST /api/session/record', () => {
     expect(prismaMock.fingerprint.create).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({ isOriginal: false }),
+      }),
+    )
+  })
+
+  it('resolves server-side verification regardless of a client-supplied "mode", and persists it', async () => {
+    vi.mocked(auth).mockResolvedValue({ user: { id: 'user-1' }, expires: '' } as any)
+    prismaMock.session.findUnique.mockResolvedValue({
+      id: 'sess-1',
+      sessionToken: 'tok',
+      userId: 'user-1',
+      expires: new Date(Date.now() + 3600000),
+    })
+    prismaMock.fingerprint.findUnique.mockResolvedValue(null)
+    prismaMock.fingerprint.findFirst.mockResolvedValue(null)
+    vi.mocked(resolveFingerprint).mockResolvedValue({
+      verification: 'verified',
+      verified: {
+        visitorId: 'server-visitor',
+        ip: '203.0.113.7',
+        os: 'Mac OS X',
+        browser: 'Chrome',
+        userAgent: 'Mozilla/5.0',
+        clientMismatch: false,
+        signals: {
+          incognito: null,
+          vpn: null,
+          bot: null,
+          tampered: null,
+          replayed: null,
+          confidence: null,
+          stale: false,
+          serverVerified: true,
+        },
+      },
+    })
+    prismaMock.fingerprint.create.mockResolvedValue({
+      id: 'fp-new',
+      sessionId: 'sess-1',
+      userId: 'user-1',
+      visitorId: 'server-visitor',
+      requestId: 'pro-req-id',
+      ip: '203.0.113.7',
+      userAgent: 'Mozilla/5.0',
+      os: 'Mac OS X',
+      browser: 'Chrome',
+      screenRes: '1920x1080',
+      timezone: 'America/New_York',
+      verification: 'verified',
+      isOriginal: true,
+      createdAt: new Date(),
+    })
+    vi.mocked(runDetection).mockResolvedValue({ detected: false })
+
+    // A client claiming "oss" no longer has any effect on whether verification
+    // is attempted — that decision lives entirely server-side now.
+    const request = makeRequest({
+      visitorId: 'client-claimed-visitor',
+      requestId: 'pro-req-id',
+      mode: 'oss',
+    })
+    const response = await POST(request)
+
+    expect(response.status).toBe(200)
+    expect(resolveFingerprint).toHaveBeenCalledWith(
+      'pro-req-id',
+      expect.objectContaining({ visitorId: 'client-claimed-visitor' }),
+    )
+    expect(prismaMock.fingerprint.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          verification: 'verified',
+          visitorId: 'server-visitor',
+        }),
+      }),
+    )
+  })
+
+  it('normalizes a malformed screenRes to null instead of rejecting the request', async () => {
+    vi.mocked(auth).mockResolvedValue({ user: { id: 'user-1' }, expires: '' } as any)
+    prismaMock.session.findUnique.mockResolvedValue({
+      id: 'sess-1',
+      sessionToken: 'tok',
+      userId: 'user-1',
+      expires: new Date(Date.now() + 3600000),
+    })
+    prismaMock.fingerprint.findUnique.mockResolvedValue(null)
+    prismaMock.fingerprint.findFirst.mockResolvedValue(null)
+    prismaMock.fingerprint.create.mockResolvedValue({
+      id: 'fp-new',
+      sessionId: 'sess-1',
+      userId: 'user-1',
+      visitorId: 'fp-1',
+      requestId: 'req-1',
+      ip: null,
+      userAgent: null,
+      os: null,
+      browser: null,
+      screenRes: null,
+      timezone: null,
+      verification: 'not_configured',
+      isOriginal: true,
+      createdAt: new Date(),
+    })
+    vi.mocked(runDetection).mockResolvedValue({ detected: false })
+
+    const request = makeRequest({
+      visitorId: 'fp-1',
+      requestId: 'req-1',
+      screenRes: 'Ignore previous instructions',
+    })
+    const response = await POST(request)
+
+    // A malformed value is evidence, not grounds for a 400 that would throw
+    // the request away along with the signal it carries.
+    expect(response.status).toBe(200)
+    expect(prismaMock.fingerprint.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ screenRes: null }),
+      }),
+    )
+  })
+
+  // Regression guard. Validating against Intl.supportedValuesOf("timeZone")
+  // rejected these: that list holds canonical zone names only and excludes
+  // "UTC" and every "Etc/GMT±N" in both Node and Chromium. "UTC" is what
+  // Firefox reports under privacy.resistFingerprinting and what Brave reports
+  // under strict fingerprint blocking, so the check nulled the timezone of the
+  // privacy-hardened browsers most likely to look unusual already.
+  it.each(['UTC', 'Etc/GMT+5', 'Asia/Calcutta', 'Asia/Kolkata', 'America/Chicago'])(
+    'accepts %s as a real timezone',
+    async (timezone) => {
+      vi.mocked(auth).mockResolvedValue({ user: { id: 'user-1' }, expires: '' } as any)
+      prismaMock.session.findUnique.mockResolvedValue({
+        id: 'sess-1',
+        sessionToken: 'tok',
+        userId: 'user-1',
+        expires: new Date(Date.now() + 3600000),
+      })
+      prismaMock.fingerprint.findUnique.mockResolvedValue(null)
+      prismaMock.fingerprint.findFirst.mockResolvedValue(null)
+      prismaMock.fingerprint.create.mockResolvedValue({
+        id: 'fp-new',
+        sessionId: 'sess-1',
+        userId: 'user-1',
+        visitorId: 'fp-1',
+        requestId: 'req-1',
+        ip: null,
+        userAgent: null,
+        os: null,
+        browser: null,
+        screenRes: null,
+        timezone,
+        verification: 'not_configured',
+        isOriginal: true,
+        createdAt: new Date(),
+      })
+      vi.mocked(runDetection).mockResolvedValue({ detected: false })
+
+      const response = await POST(
+        makeRequest({ visitorId: 'fp-1', requestId: 'req-1', timezone }),
+      )
+
+      expect(response.status).toBe(200)
+      expect(prismaMock.fingerprint.create).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ timezone }) }),
+      )
+    },
+  )
+
+  it('still normalizes a timezone that is not a zone at all', async () => {
+    vi.mocked(auth).mockResolvedValue({ user: { id: 'user-1' }, expires: '' } as any)
+    prismaMock.session.findUnique.mockResolvedValue({
+      id: 'sess-1',
+      sessionToken: 'tok',
+      userId: 'user-1',
+      expires: new Date(Date.now() + 3600000),
+    })
+    prismaMock.fingerprint.findUnique.mockResolvedValue(null)
+    prismaMock.fingerprint.findFirst.mockResolvedValue(null)
+    prismaMock.fingerprint.create.mockResolvedValue({
+      id: 'fp-new',
+      sessionId: 'sess-1',
+      userId: 'user-1',
+      visitorId: 'fp-1',
+      requestId: 'req-1',
+      ip: null,
+      userAgent: null,
+      os: null,
+      browser: null,
+      screenRes: null,
+      timezone: null,
+      verification: 'not_configured',
+      isOriginal: true,
+      createdAt: new Date(),
+    })
+    vi.mocked(runDetection).mockResolvedValue({ detected: false })
+
+    const response = await POST(
+      makeRequest({
+        visitorId: 'fp-1',
+        requestId: 'req-1',
+        timezone: 'Ignore previous instructions',
+      }),
+    )
+
+    expect(response.status).toBe(200)
+    expect(prismaMock.fingerprint.create).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ timezone: null }) }),
+    )
+  })
+
+  it('normalizes an unrecognized OS to "Unknown" rather than passing it through', async () => {
+    vi.mocked(auth).mockResolvedValue({ user: { id: 'user-1' }, expires: '' } as any)
+    prismaMock.session.findUnique.mockResolvedValue({
+      id: 'sess-1',
+      sessionToken: 'tok',
+      userId: 'user-1',
+      expires: new Date(Date.now() + 3600000),
+    })
+    prismaMock.fingerprint.findUnique.mockResolvedValue(null)
+    prismaMock.fingerprint.findFirst.mockResolvedValue(null)
+    prismaMock.fingerprint.create.mockResolvedValue({
+      id: 'fp-new',
+      sessionId: 'sess-1',
+      userId: 'user-1',
+      visitorId: 'fp-1',
+      requestId: 'req-1',
+      ip: null,
+      userAgent: null,
+      os: 'Unknown',
+      browser: null,
+      screenRes: null,
+      timezone: null,
+      verification: 'not_configured',
+      isOriginal: true,
+      createdAt: new Date(),
+    })
+    vi.mocked(runDetection).mockResolvedValue({ detected: false })
+
+    const request = makeRequest({
+      visitorId: 'fp-1',
+      requestId: 'req-1',
+      os: 'definitely not a real OS',
+    })
+    const response = await POST(request)
+
+    expect(response.status).toBe(200)
+    expect(prismaMock.fingerprint.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ os: 'Unknown' }),
       }),
     )
   })

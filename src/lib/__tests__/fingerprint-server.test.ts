@@ -24,7 +24,9 @@ vi.mock('@fingerprintjs/fingerprintjs-pro-server-api', () => ({
 
 import {
   verifyFingerprint,
+  resolveFingerprint,
   formatSignals,
+  formatDerivedSignals,
   checkServerApiHealth,
   getCachedServerApiHealth,
   describeErrorCode,
@@ -146,6 +148,53 @@ describe('verifyFingerprint', () => {
   })
 })
 
+describe('resolveFingerprint', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    process.env.FINGERPRINT_SERVER_API_KEY = 'secret'
+  })
+
+  afterEach(() => {
+    delete process.env.FINGERPRINT_SERVER_API_KEY
+  })
+
+  it('classifies not_configured when no server key is set, without calling the API', async () => {
+    delete process.env.FINGERPRINT_SERVER_API_KEY
+
+    const result = await resolveFingerprint('req-1', { visitorId: 'client' })
+
+    expect(result).toEqual({ verification: 'not_configured', verified: null })
+    expect(mockGetEvent).not.toHaveBeenCalled()
+  })
+
+  it('classifies unverifiable for a UUID-shaped requestId, without calling the API', async () => {
+    const result = await resolveFingerprint(
+      '123e4567-e89b-12d3-a456-426614174000',
+      { visitorId: 'client' },
+    )
+
+    expect(result).toEqual({ verification: 'unverifiable', verified: null })
+    expect(mockGetEvent).not.toHaveBeenCalled()
+  })
+
+  it('classifies verified when the lookup succeeds for a non-UUID requestId', async () => {
+    mockGetEvent.mockResolvedValue(eventFixture())
+
+    const result = await resolveFingerprint('pro-request-id', { visitorId: 'server-visitor' })
+
+    expect(result.verification).toBe('verified')
+    expect(result.verified?.visitorId).toBe('server-visitor')
+  })
+
+  it('classifies unresolved when the lookup fails for a non-UUID requestId', async () => {
+    mockGetEvent.mockRejectedValue(new Error('network down'))
+
+    const result = await resolveFingerprint('pro-request-id', { visitorId: 'client' })
+
+    expect(result).toEqual({ verification: 'unresolved', verified: null })
+  })
+})
+
 describe('checkServerApiHealth', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -244,32 +293,35 @@ describe('describeErrorCode', () => {
   })
 })
 
+const NO_SIGNALS = {
+  incognito: null,
+  vpn: null,
+  bot: null,
+  tampered: null,
+  replayed: null,
+  confidence: null,
+  stale: null,
+  serverVerified: false,
+} as const
+
 describe('formatSignals', () => {
   it('omits signals the plan did not provide', () => {
-    const out = formatSignals({
-      incognito: null,
-      vpn: null,
-      bot: null,
-      tampered: null,
-      replayed: null,
-      confidence: null,
-      stale: false,
-    })
+    const out = formatSignals({ ...NO_SIGNALS, stale: false, serverVerified: true })
 
     expect(out).not.toContain('Incognito')
     expect(out).not.toContain('VPN')
     expect(out).not.toContain('confidence')
-    // Staleness is derived locally, so it is always reported
+    // Derived from the event timestamp rather than a paid signal, so it is
+    // reported whenever an event was actually resolved
     expect(out).toContain('replay window: no')
   })
 
   it('includes only the signals that are present', () => {
     const out = formatSignals({
+      ...NO_SIGNALS,
+      serverVerified: true,
       incognito: true,
-      vpn: null,
       bot: false,
-      tampered: null,
-      replayed: null,
       confidence: 0.97,
       stale: false,
     })
@@ -279,5 +331,49 @@ describe('formatSignals', () => {
     expect(out).toContain('Identification confidence: 0.97')
     expect(out).not.toContain('VPN')
     expect(out).not.toContain('tampering')
+  })
+
+  it('omits the staleness line when no event was resolved', () => {
+    // stale null means there was no identification event to age-check.
+    // Printing "not stale" here would assert a clean result the API never gave.
+    const out = formatSignals({ ...NO_SIGNALS, downgraded: true })
+
+    expect(out).toBe('')
+    expect(out).not.toContain('replay window')
+  })
+
+  it('never renders the locally-derived flags as server-observed', () => {
+    const out = formatSignals({
+      ...NO_SIGNALS,
+      serverVerified: true,
+      stale: false,
+      downgraded: true,
+      shapeAnomaly: true,
+    })
+
+    expect(out).not.toContain('downgraded')
+    expect(out).not.toContain('shape check')
+  })
+})
+
+describe('formatDerivedSignals', () => {
+  it('renders only the flags this app worked out for itself', () => {
+    const out = formatDerivedSignals({
+      ...NO_SIGNALS,
+      serverVerified: true,
+      stale: false,
+      incognito: true,
+      downgraded: true,
+      shapeAnomaly: false,
+    })
+
+    expect(out).toContain('Verification downgraded from established session: yes')
+    expect(out).toContain('Client-reported component failed its shape check: no')
+    expect(out).not.toContain('Incognito')
+    expect(out).not.toContain('replay window')
+  })
+
+  it('returns empty when there is nothing derived to report', () => {
+    expect(formatDerivedSignals({ ...NO_SIGNALS, serverVerified: true, stale: false })).toBe('')
   })
 })

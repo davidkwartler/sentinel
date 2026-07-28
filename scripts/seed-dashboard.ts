@@ -26,6 +26,7 @@ async function main() {
       expires: futureDate,
       fingerprints: {
         create: {
+          userId: user.id,
           visitorId: "abc123def456gh",
           requestId: `req-flagged-orig-${Date.now()}`,
           ip: "203.0.113.42",
@@ -39,10 +40,19 @@ async function main() {
       },
       detectionEvents: {
         create: {
+          userId: user.id,
           originalVisitorId: "abc123def456gh",
           newVisitorId: "xyz789qrs012tu",
           originalIp: "203.0.113.42",
           newIp: "198.51.100.77",
+          originalOs: "Mac OS",
+          originalBrowser: "Chrome",
+          originalScreenRes: "1920x1080",
+          originalTimezone: "America/New_York",
+          newOs: "Windows",
+          newBrowser: "Firefox",
+          newScreenRes: "1920x1080",
+          newTimezone: "Europe/Warsaw",
           similarityScore: 0.25,
           status: "FLAGGED",
           confidenceScore: 92,
@@ -62,6 +72,7 @@ async function main() {
       expires: futureDate,
       fingerprints: {
         create: {
+          userId: user.id,
           visitorId: "mno345pqr678st",
           requestId: `req-clear-orig-${Date.now()}`,
           ip: "192.0.2.10",
@@ -75,10 +86,19 @@ async function main() {
       },
       detectionEvents: {
         create: {
+          userId: user.id,
           originalVisitorId: "mno345pqr678st",
           newVisitorId: "mno345pqr999zz",
           originalIp: "192.0.2.10",
           newIp: "192.0.2.11",
+          originalOs: "Mac OS",
+          originalBrowser: "Safari",
+          originalScreenRes: "2560x1440",
+          originalTimezone: "America/Chicago",
+          newOs: "Mac OS",
+          newBrowser: "Safari",
+          newScreenRes: "2560x1440",
+          newTimezone: "America/Chicago",
           similarityScore: 0.85,
           status: "CLEAR",
           confidenceScore: 22,
@@ -98,6 +118,7 @@ async function main() {
       expires: futureDate,
       fingerprints: {
         create: {
+          userId: user.id,
           visitorId: "jkl901uvw234xy",
           requestId: `req-pending-orig-${Date.now()}`,
           ip: "10.0.0.55",
@@ -111,10 +132,19 @@ async function main() {
       },
       detectionEvents: {
         create: {
+          userId: user.id,
           originalVisitorId: "jkl901uvw234xy",
           newVisitorId: "aaa111bbb222cc",
           originalIp: "10.0.0.55",
           newIp: "172.16.0.99",
+          originalOs: "Windows",
+          originalBrowser: "Chrome",
+          originalScreenRes: "1366x768",
+          originalTimezone: "Europe/London",
+          newOs: "Windows",
+          newBrowser: "Chrome",
+          newScreenRes: "1366x768",
+          newTimezone: "Europe/London",
           similarityScore: 0.45,
           status: "PENDING",
         },
@@ -131,6 +161,7 @@ async function main() {
       expires: futureDate,
       fingerprints: {
         create: {
+          userId: user.id,
           visitorId: "def456ghi789jk",
           requestId: `req-active-orig-${Date.now()}`,
           ip: "100.64.0.1",
@@ -154,6 +185,7 @@ async function main() {
       expires: futureDate,
       fingerprints: {
         create: {
+          userId: user.id,
           visitorId: "qqq555rrr888ss",
           requestId: `req-flagged2-orig-${Date.now()}`,
           ip: "151.101.1.140",
@@ -167,10 +199,19 @@ async function main() {
       },
       detectionEvents: {
         create: {
+          userId: user.id,
           originalVisitorId: "qqq555rrr888ss",
           newVisitorId: "zzz000www111vv",
           originalIp: "151.101.1.140",
           newIp: "45.33.32.156",
+          originalOs: "Linux",
+          originalBrowser: "Chrome",
+          originalScreenRes: "1920x1200",
+          originalTimezone: "Asia/Tokyo",
+          newOs: "Windows",
+          newBrowser: "Edge",
+          newScreenRes: "1280x720",
+          newTimezone: "America/New_York",
           similarityScore: 0.10,
           status: "FLAGGED",
           confidenceScore: 97,

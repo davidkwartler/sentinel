@@ -1,7 +1,16 @@
 import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
 
-export function middleware(request: NextRequest) {
+// Authorization is route-level by design, not enforced here. Every protected
+// route (/sessions, /account, /api/fingerprint/health, ...) calls auth()
+// directly — the Auth.js v5 pattern, and the one that survives this file
+// being renamed, skipped, or matched around differently. A root-level
+// proxy.ts (Next resolves the middleware/proxy module next to src/app, since
+// this project keeps app under src/) used to sit alongside this file with a
+// matcher that looked like it covered everything, but Next only ever loaded
+// this one — the root file was dead code. It's gone now; don't re-add a
+// second file here expecting it to enforce anything.
+export function proxy(request: NextRequest) {
   const response = NextResponse.next()
 
   // Deliberate demo affordance, not a bug: pre-creating an "anonymous"
