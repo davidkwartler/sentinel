@@ -73,6 +73,37 @@ model Fingerprint {
   // "verified" | "unresolved" | "unverifiable" | "not_configured" | "unknown".
   // Existing rows default to "unknown" so historical data is never read as verified.
   verification String   @default("unknown")
+
+  // Server-observed detail, promoted out of rawEvent because the comparison
+  // table and the prompt read them directly. Null in OSS mode and whenever
+  // verification did not resolve — the browser cannot supply any of these.
+  osVersion        String?
+  browserVersion   String?
+  device           String?
+  /// Derived from the IP server-side, unlike `timezone`, which the browser
+  /// reports about itself and is therefore a claim rather than an observation.
+  ipTimezone       String?
+  ipCity           String?
+  ipCountry        String?
+  ipSubdivision    String?
+  ipLatitude       Float?
+  ipLongitude      Float?
+  /// Kilometres. IP geolocation is coarse; distance claims must respect it.
+  ipAccuracyRadius Int?
+  asn              String?
+  asnName          String?
+  /// "isp" | "hosting" | "business" | ... — an ISP-to-hosting move is the tell.
+  asnType          String?
+  /// First and last time Fingerprint saw this visitor on this subscription.
+  firstSeenAt      DateTime?
+  lastSeenAt       DateTime?
+  /// Fingerprint's own 0-100 risk number, independent of Claude's score.
+  suspectScore     Int?
+
+  /// The resolved identification event, minus identification.components.
+  /// Snapshotted at capture time: Fingerprint's retention window expires, so a
+  /// live re-fetch would fail on exactly the historical rows worth inspecting.
+  rawEvent     Json?
   isOriginal   Boolean  @default(false)
   createdAt    DateTime @default(now())
   user         User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -118,6 +149,13 @@ model DetectionEvent {
   newScreenRes      String?
   newTimezone       String?
   newUserAgent      String?  @db.Text
+  /// Server-observed location and network, rendered to a line per side rather
+  /// than denormalizing fifteen columns twice over. Null unless verification
+  /// resolved for that side.
+  originalLocation  String?
+  originalNetwork   String?
+  newLocation       String?
+  newNetwork        String?
   similarityScore   Float
   status            String   @default("PENDING")
   confidenceScore   Float?

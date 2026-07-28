@@ -53,6 +53,30 @@ evidence of an attacker actively evading detection — raise the score sharply e
 device characteristics match, since matching characteristics may themselves be forged.
 - Low identification confidence means the visitor ID itself is unreliable — lean on OS, \
 browser, and screen instead.
+- IP from a datacenter/hosting provider = yes is among the strongest signals here. Ordinary \
+people browse from consumer ISPs; a session cookie that established on a residential connection \
+and reappears from hosting infrastructure is the characteristic shape of cookie replay. Raise \
+the score substantially.
+- Request IP on a malicious-actor blocklist, or known for network attacks, is corroborating \
+evidence of the same kind. Treat 'known for network attacks' as stronger than a generic \
+blocklist hit.
+- Browser timezone disagrees with its IP's timezone = yes means the browser's self-reported \
+timezone does not match where its IP actually is. That is expected under a VPN and suspicious \
+without one, so read it together with the VPN signal rather than alone.
+- Visitor seen by Fingerprint before this event = no means this device has no history at all. \
+A stolen cookie arriving on a device Fingerprint has never seen is more suspicious than one \
+arriving on a long-known device; but a genuinely new browser, a cleared profile, or a first \
+visit also produce this, so treat it as supporting rather than deciding evidence.
+- Distinct IPs and distinct countries are per-visitor counts over rolling windows. Several \
+countries within an hour is strong evidence regardless of anything else.
+- Fingerprint's own suspect score is an independent assessment on the same 0-100 scale you \
+are producing. It is not authoritative and you should not simply echo it — but a large \
+disagreement is worth being explicit about in your reasoning.
+- Where a signal reports an ML score alongside its verdict, weigh the score, not just the \
+verdict. A tampering verdict of 'no' at ML score 0.04 is a clear pass; the same 'no' at 0.45 \
+is genuinely ambiguous and should temper any conclusion that rests on it. Signals that report \
+only a confidence level, with no score, carry no such nuance — read the verdict and the \
+confidence together and no further.
 Only signals available on the current Fingerprint plan are listed. A signal that does not \
 appear was not measured — treat it as unknown, and do NOT read its absence as evidence \
 either way. Judge on the signals present plus the device characteristics.
@@ -71,6 +95,11 @@ resolution, or timezone did not look like a real device value and was replaced b
 this prompt — a client reporting components that match no real device is misreporting, which is \
 itself an indicator, though a weaker one than the signals above since it can also result from a \
 misconfigured or unusual browser.
+- Distance between the two IP locations is computed from server-observed coordinates, so it \
+does not depend on the browser's self-reported timezone. It is always reported with a combined \
+accuracy radius: IP geolocation resolves to tens of kilometres, so a distance at or below that \
+radius is NOT evidence of movement and must not be described as travel. A distance far beyond \
+it, over a short interval, is impossible travel and is decisive.
 This block appearing on its own, with no server-verified block, means verification was \
 unavailable for this fingerprint — which is itself what the downgrade signal is reporting.
 
@@ -120,6 +149,8 @@ function formatFingerprint(fp: {
   screenRes: string | null
   timezone: string | null
   userAgent: string | null
+  location?: string | null
+  network?: string | null
 }) {
   return [
     `  Visitor ID: ${sanitize(fp.visitorId)}`,
@@ -127,7 +158,11 @@ function formatFingerprint(fp: {
     `  OS: ${sanitize(fp.os)}`,
     `  Browser: ${sanitize(fp.browser)}`,
     `  Screen Resolution: ${sanitize(fp.screenRes)}`,
-    `  Timezone: ${sanitize(fp.timezone)}`,
+    // Client-reported. The Location line below is server-observed, so where the
+    // two disagree the model should prefer Location.
+    `  Timezone (browser-reported): ${sanitize(fp.timezone)}`,
+    ...(fp.location ? [`  Location (server-observed): ${sanitize(fp.location)}`] : []),
+    ...(fp.network ? [`  Network (server-observed): ${sanitize(fp.network)}`] : []),
     // 400 chars was the largest interpolated field and, whenever server
     // verification is unavailable, comes straight from the request header
     // with no shape validation at all (unlike os/browser/screenRes/timezone,
@@ -157,6 +192,8 @@ export async function analyzeDetectionEvent(
     screenRes: event.originalScreenRes,
     timezone: event.originalTimezone,
     userAgent: event.originalUserAgent,
+    location: event.originalLocation,
+    network: event.originalNetwork,
   }
   const newest = {
     visitorId: event.newVisitorId,
@@ -166,6 +203,8 @@ export async function analyzeDetectionEvent(
     screenRes: event.newScreenRes,
     timezone: event.newTimezone,
     userAgent: event.newUserAgent,
+    location: event.newLocation,
+    network: event.newNetwork,
   }
 
   const model = modelOverride ?? process.env.ANTHROPIC_MODEL ?? DEFAULT_MODEL

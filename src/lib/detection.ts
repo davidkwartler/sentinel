@@ -1,4 +1,5 @@
 import type { Prisma } from "@/generated/prisma/client"
+import { formatLocation, formatNetwork, ipDistanceKm } from "@/lib/fingerprint-server"
 
 interface FingerprintComponents {
   os?: string | null
@@ -41,6 +42,16 @@ export interface DetectionInput {
   screenRes?: string | null
   timezone?: string | null
   verification?: string
+  /** Server-observed geolocation, for the impossible-travel comparison. */
+  ipLatitude?: number | null
+  ipLongitude?: number | null
+  ipAccuracyRadius?: number | null
+  ipCity?: string | null
+  ipSubdivision?: string | null
+  ipCountry?: string | null
+  asn?: string | null
+  asnName?: string | null
+  asnType?: string | null
 }
 
 export interface DetectionResult {
@@ -52,6 +63,13 @@ export interface DetectionResult {
    * change (a user can legitimately switch Pro to OSS from /account).
    */
   downgraded?: boolean
+  /**
+   * Straight-line distance between the two fingerprints' IP locations, and the
+   * combined accuracy radius that bounds how much of it is real. Both null
+   * unless both fingerprints resolved server-side geolocation.
+   */
+  ipDistanceKm?: number | null
+  ipDistanceUncertaintyKm?: number | null
 }
 
 /**
@@ -104,6 +122,10 @@ export async function runDetection(
       newScreenRes: params.screenRes ?? null,
       newTimezone: params.timezone ?? null,
       newUserAgent: params.newUserAgent ?? null,
+      originalLocation: formatLocation(original),
+      originalNetwork: formatNetwork(original),
+      newLocation: formatLocation(params),
+      newNetwork: formatNetwork(params),
       similarityScore: score,
       status: "PENDING",
     },
@@ -112,5 +134,30 @@ export async function runDetection(
   const downgraded =
     original.verification === "verified" && params.verification !== "verified"
 
-  return { detected: true, eventId: event.id, downgraded }
+  // Impossible travel, on server-observed coordinates rather than the timezone
+  // string the browser reports about itself. Null unless both sides resolved.
+  const distance = ipDistanceKm(
+    { lat: original.ipLatitude, lon: original.ipLongitude },
+    { lat: params.ipLatitude ?? null, lon: params.ipLongitude ?? null },
+  )
+  // Null unless BOTH radii are known. Defaulting a missing one to 0 would put
+  // "combined accuracy radius 0 km" in front of the model, which reads as
+  // perfect precision and turns any nonzero distance into travel. In practice
+  // the radius arrives in the same geolocation block as the coordinates, so
+  // this is a guard rather than a common path — but it is the one number whose
+  // whole job is to stop the model overclaiming.
+  const originalRadius = original.ipAccuracyRadius
+  const newRadius = params.ipAccuracyRadius ?? null
+  const uncertainty =
+    distance === null || originalRadius === null || newRadius === null
+      ? null
+      : originalRadius + newRadius
+
+  return {
+    detected: true,
+    eventId: event.id,
+    downgraded,
+    ipDistanceKm: distance,
+    ipDistanceUncertaintyKm: uncertainty,
+  }
 }
