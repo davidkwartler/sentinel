@@ -70,7 +70,19 @@ async function capturePro(modelOverride?: string): Promise<ProResult> {
 
   let client: Awaited<ReturnType<typeof FingerprintJSPro.load>>
   try {
-    proClientPromise ??= FingerprintJSPro.load({ apiKey })
+    // Serve the agent and its API from a first-party subdomain when one is
+    // configured. Fingerprint's default endpoints are on hostnames common
+    // blocklists carry, and a blocked agent silently degrades this app to an
+    // unverifiable client-computed hash. Unset in development, where the
+    // default endpoints are fine and a subdomain would be one more thing to
+    // stand up.
+    const endpoint = process.env.NEXT_PUBLIC_FINGERPRINT_ENDPOINT
+    const scriptUrlPattern = process.env.NEXT_PUBLIC_FINGERPRINT_SCRIPT_URL
+    proClientPromise ??= FingerprintJSPro.load({
+      apiKey,
+      ...(endpoint ? { endpoint: [endpoint] } : {}),
+      ...(scriptUrlPattern ? { scriptUrlPattern: [scriptUrlPattern] } : {}),
+    })
     client = await proClientPromise
   } catch (err) {
     console.warn("[Sentinel] Pro fingerprint agent failed to load:", err)

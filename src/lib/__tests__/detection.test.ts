@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { prismaMock } from '../__mocks__/db'
 import { computeSimilarity, runDetection } from '../detection'
+import { fingerprintRow, detectionEventRow } from '@/test/fixtures'
 
 describe('computeSimilarity', () => {
   it('returns 1.0 when all four components match', () => {
@@ -63,7 +64,7 @@ describe('runDetection', () => {
   })
 
   it('returns detected:false when visitorId matches original', async () => {
-    prismaMock.fingerprint.findFirst.mockResolvedValue({
+    prismaMock.fingerprint.findFirst.mockResolvedValue(fingerprintRow({
       id: 'fp-1',
       visitorId: 'fp-same',
       sessionId: 'sess-1',
@@ -78,7 +79,7 @@ describe('runDetection', () => {
       verification: 'unknown',
       isOriginal: true,
       createdAt: new Date(),
-    })
+    }))
 
     const result = await runDetection(prismaMock, {
       sessionId: 'sess-1',
@@ -90,7 +91,7 @@ describe('runDetection', () => {
   })
 
   it('returns detected:true and creates DetectionEvent on visitorId mismatch', async () => {
-    prismaMock.fingerprint.findFirst.mockResolvedValue({
+    prismaMock.fingerprint.findFirst.mockResolvedValue(fingerprintRow({
       id: 'fp-1',
       visitorId: 'fp-original',
       sessionId: 'sess-1',
@@ -105,8 +106,8 @@ describe('runDetection', () => {
       verification: 'unknown',
       isOriginal: true,
       createdAt: new Date(),
-    })
-    prismaMock.detectionEvent.create.mockResolvedValue({
+    }))
+    prismaMock.detectionEvent.create.mockResolvedValue(detectionEventRow({
       id: 'event-1',
       createdAt: new Date(),
       userId: 'user-1',
@@ -129,7 +130,7 @@ describe('runDetection', () => {
       status: 'PENDING',
       confidenceScore: null,
       reasoning: null,
-    })
+    }))
 
     const result = await runDetection(prismaMock, {
       sessionId: 'sess-1',
@@ -148,7 +149,7 @@ describe('runDetection', () => {
   })
 
   it('flags downgraded:true when the original was verified and the new one is not', async () => {
-    prismaMock.fingerprint.findFirst.mockResolvedValue({
+    prismaMock.fingerprint.findFirst.mockResolvedValue(fingerprintRow({
       id: 'fp-1',
       visitorId: 'fp-original',
       sessionId: 'sess-1',
@@ -163,8 +164,8 @@ describe('runDetection', () => {
       verification: 'verified',
       isOriginal: true,
       createdAt: new Date(),
-    })
-    prismaMock.detectionEvent.create.mockResolvedValue({
+    }))
+    prismaMock.detectionEvent.create.mockResolvedValue(detectionEventRow({
       id: 'event-2',
       createdAt: new Date(),
       userId: 'user-1',
@@ -187,7 +188,7 @@ describe('runDetection', () => {
       status: 'PENDING',
       confidenceScore: null,
       reasoning: null,
-    })
+    }))
 
     const result = await runDetection(prismaMock, {
       sessionId: 'sess-1',
@@ -201,7 +202,7 @@ describe('runDetection', () => {
   })
 
   it('does not flag downgraded when the original was never verified', async () => {
-    prismaMock.fingerprint.findFirst.mockResolvedValue({
+    prismaMock.fingerprint.findFirst.mockResolvedValue(fingerprintRow({
       id: 'fp-1',
       visitorId: 'fp-original',
       sessionId: 'sess-1',
@@ -216,8 +217,8 @@ describe('runDetection', () => {
       verification: 'not_configured',
       isOriginal: true,
       createdAt: new Date(),
-    })
-    prismaMock.detectionEvent.create.mockResolvedValue({
+    }))
+    prismaMock.detectionEvent.create.mockResolvedValue(detectionEventRow({
       id: 'event-3',
       createdAt: new Date(),
       userId: 'user-1',
@@ -240,7 +241,7 @@ describe('runDetection', () => {
       status: 'PENDING',
       confidenceScore: null,
       reasoning: null,
-    })
+    }))
 
     const result = await runDetection(prismaMock, {
       sessionId: 'sess-1',
