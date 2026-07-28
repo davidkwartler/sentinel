@@ -80,6 +80,7 @@ describe('POST /api/session/record', () => {
     prismaMock.fingerprint.findUnique.mockResolvedValue({
       id: 'fp-existing',
       sessionId: 'sess-1',
+      userId: 'user-1',
       visitorId: 'fp-original',
       requestId: 'req-1',
       ip: null,
@@ -127,6 +128,7 @@ describe('POST /api/session/record', () => {
     prismaMock.fingerprint.create.mockResolvedValue({
       id: 'fp-new',
       sessionId: 'sess-1',
+      userId: 'user-1',
       visitorId: 'fp-1',
       requestId: 'req-1',
       ip: null,
@@ -161,8 +163,16 @@ describe('POST /api/session/record', () => {
         data: expect.objectContaining({
           isOriginal: true,
           visitorId: 'fp-1',
+          userId: 'user-1',
         }),
       }),
+    )
+    // Fingerprint/DetectionEvent are keyed to the user independent of the
+    // session, so a sign-out (which deletes the Session row) doesn't cascade
+    // them away — see runDetection's userId param.
+    expect(runDetection).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ userId: 'user-1' }),
     )
   })
 
@@ -179,6 +189,7 @@ describe('POST /api/session/record', () => {
     prismaMock.fingerprint.create.mockResolvedValue({
       id: 'fp-second',
       sessionId: 'sess-1',
+      userId: 'user-1',
       visitorId: 'fp-2',
       requestId: 'req-2',
       ip: null,
@@ -237,6 +248,7 @@ describe('POST /api/session/record', () => {
     prismaMock.fingerprint.create.mockResolvedValue({
       id: 'fp-new',
       sessionId: 'sess-1',
+      userId: 'user-1',
       visitorId: 'server-visitor',
       requestId: 'pro-req-id',
       ip: '203.0.113.7',

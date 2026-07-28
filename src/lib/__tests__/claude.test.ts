@@ -31,42 +31,26 @@ describe('analyzeDetectionEvent', () => {
     prismaMock.detectionEvent.findUnique.mockResolvedValue({
       id: 'event-1',
       createdAt: new Date(),
+      userId: 'user-1',
       sessionId: 'sess-1',
       originalVisitorId: 'fp-original',
       newVisitorId: 'fp-new',
       originalIp: '1.2.3.4',
       newIp: '9.9.9.9',
+      originalOs: 'Mac OS',
+      originalBrowser: 'Chrome',
+      originalScreenRes: '1920x1080',
+      originalTimezone: 'America/New_York',
+      originalUserAgent: 'Mozilla/5.0',
+      newOs: 'Windows',
+      newBrowser: 'Firefox',
+      newScreenRes: '1366x768',
+      newTimezone: 'Europe/London',
+      newUserAgent: 'Mozilla/5.0',
       similarityScore: 0.0,
       status: 'PENDING',
       confidenceScore: null,
       reasoning: null,
-      session: {
-        id: 'sess-1',
-        fingerprints: [
-          {
-            visitorId: 'fp-original',
-            ip: '1.2.3.4',
-            os: 'Mac OS',
-            browser: 'Chrome',
-            screenRes: '1920x1080',
-            timezone: 'America/New_York',
-            userAgent: 'Mozilla/5.0',
-            isOriginal: true,
-            createdAt: new Date(),
-          },
-          {
-            visitorId: 'fp-new',
-            ip: '9.9.9.9',
-            os: 'Windows',
-            browser: 'Firefox',
-            screenRes: '1366x768',
-            timezone: 'Europe/London',
-            userAgent: 'Mozilla/5.0',
-            isOriginal: false,
-            createdAt: new Date(),
-          },
-        ],
-      },
     } as any)
 
     mockCreate.mockResolvedValue({
@@ -86,6 +70,11 @@ describe('analyzeDetectionEvent', () => {
     await analyzeDetectionEvent('event-1')
 
     expect(mockCreate).toHaveBeenCalledOnce()
+    // The prompt should carry the denormalized components straight off the
+    // event — no session/fingerprint join involved.
+    const promptContent = mockCreate.mock.calls[0][0].messages[0].content
+    expect(promptContent).toContain('OS: Mac OS')
+    expect(promptContent).toContain('OS: Windows')
     expect(prismaMock.detectionEvent.update).toHaveBeenCalledWith({
       where: { id: 'event-1' },
       data: {
@@ -100,42 +89,26 @@ describe('analyzeDetectionEvent', () => {
     prismaMock.detectionEvent.findUnique.mockResolvedValue({
       id: 'event-2',
       createdAt: new Date(),
+      userId: 'user-1',
       sessionId: 'sess-1',
       originalVisitorId: 'fp-original',
       newVisitorId: 'fp-incognito',
       originalIp: '1.2.3.4',
       newIp: '1.2.3.4',
+      originalOs: 'Mac OS',
+      originalBrowser: 'Chrome',
+      originalScreenRes: '1920x1080',
+      originalTimezone: 'America/New_York',
+      originalUserAgent: 'Mozilla/5.0',
+      newOs: 'Mac OS',
+      newBrowser: 'Chrome',
+      newScreenRes: '1920x1080',
+      newTimezone: 'America/New_York',
+      newUserAgent: 'Mozilla/5.0',
       similarityScore: 0.75,
       status: 'PENDING',
       confidenceScore: null,
       reasoning: null,
-      session: {
-        id: 'sess-1',
-        fingerprints: [
-          {
-            visitorId: 'fp-original',
-            ip: '1.2.3.4',
-            os: 'Mac OS',
-            browser: 'Chrome',
-            screenRes: '1920x1080',
-            timezone: 'America/New_York',
-            userAgent: 'Mozilla/5.0',
-            isOriginal: true,
-            createdAt: new Date(),
-          },
-          {
-            visitorId: 'fp-incognito',
-            ip: '1.2.3.4',
-            os: 'Mac OS',
-            browser: 'Chrome',
-            screenRes: '1920x1080',
-            timezone: 'America/New_York',
-            userAgent: 'Mozilla/5.0',
-            isOriginal: false,
-            createdAt: new Date(),
-          },
-        ],
-      },
     } as any)
 
     mockCreate.mockResolvedValue({
@@ -168,31 +141,26 @@ describe('analyzeDetectionEvent', () => {
     prismaMock.detectionEvent.findUnique.mockResolvedValue({
       id: 'event-3',
       createdAt: new Date(),
+      userId: 'user-1',
       sessionId: 'sess-1',
       originalVisitorId: 'fp-original',
       newVisitorId: 'fp-new',
       originalIp: '1.2.3.4',
       newIp: '9.9.9.9',
+      originalOs: null,
+      originalBrowser: null,
+      originalScreenRes: null,
+      originalTimezone: null,
+      originalUserAgent: null,
+      newOs: null,
+      newBrowser: null,
+      newScreenRes: null,
+      newTimezone: null,
+      newUserAgent: null,
       similarityScore: 0.0,
       status: 'PENDING',
       confidenceScore: null,
       reasoning: null,
-      session: {
-        id: 'sess-1',
-        fingerprints: [
-          {
-            visitorId: 'fp-original',
-            ip: '1.2.3.4',
-            os: null,
-            browser: null,
-            screenRes: null,
-            timezone: null,
-            userAgent: null,
-            isOriginal: true,
-            createdAt: new Date(),
-          },
-        ],
-      },
     } as any)
 
     mockCreate.mockResolvedValue({
@@ -211,16 +179,26 @@ describe('analyzeDetectionEvent', () => {
     prismaMock.detectionEvent.findUnique.mockResolvedValue({
       id: 'event-5',
       createdAt: new Date(),
+      userId: 'user-1',
       sessionId: 'sess-1',
       originalVisitorId: 'fp-original',
       newVisitorId: 'fp-new',
       originalIp: null,
       newIp: null,
+      originalOs: null,
+      originalBrowser: null,
+      originalScreenRes: null,
+      originalTimezone: null,
+      originalUserAgent: null,
+      newOs: null,
+      newBrowser: null,
+      newScreenRes: null,
+      newTimezone: null,
+      newUserAgent: null,
       similarityScore: 0.5,
       status: 'PENDING',
       confidenceScore: null,
       reasoning: null,
-      session: { id: 'sess-1', fingerprints: [] },
     } as any)
 
     mockCreate.mockResolvedValue({
@@ -238,23 +216,72 @@ describe('analyzeDetectionEvent', () => {
     })
   })
 
+  it('renders correctly for an orphaned event whose session was deleted', async () => {
+    // sessionId null: the Session row was deleted on sign-out, but the event
+    // survives with its own denormalized components — this must not throw or
+    // read as "no data".
+    prismaMock.detectionEvent.findUnique.mockResolvedValue({
+      id: 'event-6',
+      createdAt: new Date(),
+      userId: 'user-1',
+      sessionId: null,
+      originalVisitorId: 'fp-original',
+      newVisitorId: 'fp-new',
+      originalIp: '1.2.3.4',
+      newIp: '9.9.9.9',
+      originalOs: 'Mac OS',
+      originalBrowser: 'Chrome',
+      originalScreenRes: '1920x1080',
+      originalTimezone: 'America/New_York',
+      originalUserAgent: 'Mozilla/5.0',
+      newOs: 'Windows',
+      newBrowser: 'Firefox',
+      newScreenRes: '1366x768',
+      newTimezone: 'Europe/London',
+      newUserAgent: 'Mozilla/5.0',
+      similarityScore: 0.0,
+      status: 'PENDING',
+      confidenceScore: null,
+      reasoning: null,
+    } as any)
+
+    mockCreate.mockResolvedValue({
+      content: [{ type: 'text', text: JSON.stringify({ confidenceScore: 88, reasoning: 'test' }) }],
+    })
+    prismaMock.detectionEvent.update.mockResolvedValue({} as any)
+
+    await analyzeDetectionEvent('event-6')
+
+    expect(mockCreate).toHaveBeenCalledOnce()
+    expect(prismaMock.detectionEvent.update).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: 'event-6' } }),
+    )
+  })
+
   it('throws when Claude returns unexpected content type', async () => {
     prismaMock.detectionEvent.findUnique.mockResolvedValue({
       id: 'event-4',
       createdAt: new Date(),
+      userId: 'user-1',
       sessionId: 'sess-1',
       originalVisitorId: 'fp-original',
       newVisitorId: 'fp-new',
       originalIp: null,
       newIp: null,
+      originalOs: null,
+      originalBrowser: null,
+      originalScreenRes: null,
+      originalTimezone: null,
+      originalUserAgent: null,
+      newOs: null,
+      newBrowser: null,
+      newScreenRes: null,
+      newTimezone: null,
+      newUserAgent: null,
       similarityScore: 0.0,
       status: 'PENDING',
       confidenceScore: null,
       reasoning: null,
-      session: {
-        id: 'sess-1',
-        fingerprints: [],
-      },
     } as any)
 
     mockCreate.mockResolvedValue({

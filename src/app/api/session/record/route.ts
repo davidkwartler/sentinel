@@ -154,6 +154,7 @@ export async function POST(request: NextRequest) {
           const fingerprint = await tx.fingerprint.create({
             data: {
               sessionId: dbSession.id,
+              userId: dbSession.userId,
               visitorId,
               requestId: data.requestId,
               ip,
@@ -169,8 +170,10 @@ export async function POST(request: NextRequest) {
 
           const detection = await runDetection(tx, {
             sessionId: dbSession.id,
+            userId: dbSession.userId,
             newVisitorId: visitorId,
             newIp: ip,
+            newUserAgent: userAgent,
             os,
             browser,
             screenRes: data.screenRes ?? null,

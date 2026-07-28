@@ -122,22 +122,30 @@ export async function analyzeDetectionEvent(
   flagThreshold: number = DEFAULT_FLAG_THRESHOLD,
   signals?: FingerprintSignals,
 ): Promise<void> {
-  const event = await prisma.detectionEvent.findUnique({
-    where: { id: eventId },
-    include: {
-      session: {
-        include: {
-          fingerprints: { orderBy: { createdAt: "asc" } },
-        },
-      },
-    },
-  })
+  // Read components directly off the event — they're denormalized onto it at
+  // creation time precisely so this doesn't need to join through Session ->
+  // Fingerprint, a chain that can go sessionId-null out from under a sign-out.
+  const event = await prisma.detectionEvent.findUnique({ where: { id: eventId } })
   if (!event) return
 
-  const original = event.session.fingerprints.find((fp) => fp.isOriginal)
-  const newest = event.session.fingerprints.find(
-    (fp) => fp.visitorId === event.newVisitorId,
-  )
+  const original = {
+    visitorId: event.originalVisitorId,
+    ip: event.originalIp,
+    os: event.originalOs,
+    browser: event.originalBrowser,
+    screenRes: event.originalScreenRes,
+    timezone: event.originalTimezone,
+    userAgent: event.originalUserAgent,
+  }
+  const newest = {
+    visitorId: event.newVisitorId,
+    ip: event.newIp,
+    os: event.newOs,
+    browser: event.newBrowser,
+    screenRes: event.newScreenRes,
+    timezone: event.newTimezone,
+    userAgent: event.newUserAgent,
+  }
 
   const model = modelOverride ?? process.env.ANTHROPIC_MODEL ?? DEFAULT_MODEL
 
@@ -150,9 +158,9 @@ export async function analyzeDetectionEvent(
         role: "user",
         content:
           `ORIGINAL FINGERPRINT (established the session):\n` +
-          (original ? formatFingerprint(original) : `  Visitor ID: ${sanitize(event.originalVisitorId)}\n  IP: ${sanitize(event.originalIp)}`) +
+          formatFingerprint(original) +
           `\n\nNEW FINGERPRINT (accessing the same session):\n` +
-          (newest ? formatFingerprint(newest) : `  Visitor ID: ${sanitize(event.newVisitorId)}\n  IP: ${sanitize(event.newIp)}`) +
+          formatFingerprint(newest) +
           (signals
             ? `\n\nSERVER-VERIFIED SIGNALS (from Fingerprint's server API, for the new fingerprint):\n${formatSignals(signals)}`
             : "") +

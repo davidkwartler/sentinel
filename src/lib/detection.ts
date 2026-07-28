@@ -32,8 +32,10 @@ export function computeSimilarity(
 
 export interface DetectionInput {
   sessionId: string
+  userId: string
   newVisitorId: string
   newIp: string | null
+  newUserAgent?: string | null
   os?: string | null
   browser?: string | null
   screenRes?: string | null
@@ -85,10 +87,23 @@ export async function runDetection(
   const event = await tx.detectionEvent.create({
     data: {
       sessionId,
+      userId: params.userId,
       originalVisitorId: original.visitorId,
       newVisitorId,
       originalIp: original.ip,
       newIp,
+      // Denormalized so this event can render and be re-analyzed without
+      // joining through Fingerprint, which may itself go sessionId-null.
+      originalOs: original.os,
+      originalBrowser: original.browser,
+      originalScreenRes: original.screenRes,
+      originalTimezone: original.timezone,
+      originalUserAgent: original.userAgent,
+      newOs: params.os ?? null,
+      newBrowser: params.browser ?? null,
+      newScreenRes: params.screenRes ?? null,
+      newTimezone: params.timezone ?? null,
+      newUserAgent: params.newUserAgent ?? null,
       similarityScore: score,
       status: "PENDING",
     },
