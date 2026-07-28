@@ -8,13 +8,15 @@ datasource db {
 }
 
 model User {
-  id            String    @id @default(cuid())
-  name          String?
-  email         String    @unique
-  emailVerified DateTime?
-  image         String?
-  accounts      Account[]
-  sessions      Session[]
+  id              String           @id @default(cuid())
+  name            String?
+  email           String           @unique
+  emailVerified   DateTime?
+  image           String?
+  accounts        Account[]
+  sessions        Session[]
+  fingerprints    Fingerprint[]
+  detectionEvents DetectionEvent[]
 }
 
 model Account {
@@ -36,30 +38,47 @@ model Account {
 }
 
 model Session {
-  id           String        @id @default(cuid())
-  sessionToken String        @unique
-  userId       String
-  expires      DateTime
-  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id              String           @id @default(cuid())
+  sessionToken    String           @unique
+  userId          String
+  expires         DateTime
+  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
   fingerprints    Fingerprint[]
   detectionEvents DetectionEvent[]
 }
 
 model Fingerprint {
-  id         String   @id @default(cuid())
-  sessionId  String
-  visitorId  String
-  requestId  String   @unique
-  ip         String?
-  userAgent  String?  @db.Text
-  os         String?
-  browser    String?
-  screenRes  String?
-  timezone   String?
-  isOriginal Boolean  @default(false)
-  createdAt  DateTime @default(now())
-  session    Session  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  id           String   @id @default(cuid())
+  // Owning user, independent of the session — a detection event's evidence
+  // must survive the session it was observed on being deleted (sign-out).
+  //
+  // Optional at the database level, always written by the application. Making
+  // it required would mean `prisma db push` had to add a NOT NULL column with
+  // no default to a populated table, which Postgres rejects outright, and would
+  // break every insert from the previously-deployed build during the window
+  // between migrating and shipping. Nullable removes both hazards: push, deploy,
+  // and backfill in any order. See scripts/backfill-user-ownership.mjs.
+  userId       String?
+  // Optional and SetNull on delete: sign-out deletes the Session row, and this
+  // Fingerprint should survive that as an orphaned record, not be cascaded away.
+  sessionId    String?
+  visitorId    String
+  requestId    String   @unique
+  ip           String?
+  userAgent    String?  @db.Text
+  os           String?
+  browser      String?
+  screenRes    String?
+  timezone     String?
+  // "verified" | "unresolved" | "unverifiable" | "not_configured" | "unknown".
+  // Existing rows default to "unknown" so historical data is never read as verified.
+  verification String   @default("unknown")
+  isOriginal   Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  user         User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  session      Session? @relation(fields: [sessionId], references: [id], onDelete: SetNull)
 
+  @@index([userId])
   @@index([sessionId])
   @@index([visitorId])
 }
@@ -75,16 +94,37 @@ model VerificationToken {
 model DetectionEvent {
   id                String   @id @default(cuid())
   createdAt         DateTime @default(now())
-  sessionId         String
+  // Owning user, independent of the session. Optional at the database level and
+  // always written by the application — see Fingerprint.userId for why.
+  userId            String?
+  // Optional and SetNull: this event is the app's whole output ("we detected
+  // this"), so it must outlive the session it was observed on being deleted.
+  sessionId         String?
   originalVisitorId String
   newVisitorId      String
   originalIp        String?
   newIp             String?
+  // Denormalized copies of what the UI and the Claude prompt render, so this
+  // event can resolve its own contents without joining through Fingerprint —
+  // which may itself have gone sessionId-null, but more importantly means the
+  // event doesn't depend on any other row surviving at all.
+  originalOs        String?
+  originalBrowser   String?
+  originalScreenRes String?
+  originalTimezone  String?
+  originalUserAgent String?  @db.Text
+  newOs             String?
+  newBrowser        String?
+  newScreenRes      String?
+  newTimezone       String?
+  newUserAgent      String?  @db.Text
   similarityScore   Float
   status            String   @default("PENDING")
   confidenceScore   Float?
   reasoning         String?  @db.Text
-  session           Session  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  user              User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  session           Session? @relation(fields: [sessionId], references: [id], onDelete: SetNull)
 
+  @@index([userId])
   @@index([sessionId])
 }

@@ -12,20 +12,31 @@ import {
   DEFAULT_MODEL,
   FP_CACHE_KEY,
   FP_MODE_KEY,
+  FP_PRO_STATUS_KEY,
   MODEL_KEY,
   MODEL_OPTIONS,
   THRESHOLD_KEY,
 } from "@/lib/settings"
+import type { ProFailureReason } from "@/components/FingerprintReporter"
+
+const PRO_FAILURE_LABEL: Record<ProFailureReason, string> = {
+  no_key: "not configured",
+  load_failed: "unavailable in this browser (often an ad blocker)",
+  get_failed: "failed to respond",
+}
 
 type FpMode = "pro" | "oss"
 
 const MODEL_PICKER_ENABLED =
   process.env.NEXT_PUBLIC_MODEL_PICKER_ENABLED === "true"
+const THRESHOLD_PICKER_ENABLED =
+  process.env.NEXT_PUBLIC_THRESHOLD_PICKER_ENABLED === "true"
 
 export function ProfileSettings() {
   const [fpMode, setFpMode] = useState<FpMode>("oss")
   const [model, setModel] = useState<string>(DEFAULT_MODEL)
   const [threshold, setThreshold] = useState(DEFAULT_FLAG_THRESHOLD)
+  const [proStatus, setProStatus] = useState<ProFailureReason | null>(null)
   const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
@@ -34,6 +45,9 @@ export function ProfileSettings() {
       (localStorage.getItem(FP_MODE_KEY) as FpMode) ||
         (process.env.NEXT_PUBLIC_FINGERPRINT_API_KEY ? "pro" : "oss"),
     )
+    // Set by FingerprintReporter's most recent capture attempt on this tab —
+    // this is where someone would go to act on "Pro selected but unavailable".
+    setProStatus(sessionStorage.getItem(FP_PRO_STATUS_KEY) as ProFailureReason | null)
     setModel(
       MODEL_PICKER_ENABLED
         ? localStorage.getItem(MODEL_KEY) || DEFAULT_MODEL
@@ -75,6 +89,11 @@ export function ProfileSettings() {
       <Row
         label="Fingerprint source"
         info="How each device is identified. Pro uses FingerprintJS Pro for higher accuracy and lets the server verify what the browser reports. OSS uses the open-source agent, which is less stable across sessions. Defaults to Pro when an API key is configured."
+        note={
+          fpMode === "pro" && proStatus && proStatus !== "no_key"
+            ? `Pro ${PRO_FAILURE_LABEL[proStatus]} — falling back to OSS.`
+            : undefined
+        }
       >
         <SegmentedControl
           options={[
@@ -102,9 +121,19 @@ export function ProfileSettings() {
       <Row
         label="Flag threshold"
         info={`Sessions scoring at or above this are flagged. Lower catches more hijacks and more false alarms. Default ${DEFAULT_FLAG_THRESHOLD}, minimum ${MIN_FLAG_THRESHOLD}.`}
-        note={analysisOff ? "Unused while analysis is off." : undefined}
+        note={
+          analysisOff
+            ? "Unused while analysis is off."
+            : !THRESHOLD_PICKER_ENABLED
+              ? "Threshold locked."
+              : undefined
+        }
       >
-        <div className={`flex items-center gap-3 ${analysisOff ? "opacity-50" : ""}`}>
+        <div
+          className={`flex items-center gap-3 ${
+            analysisOff || !THRESHOLD_PICKER_ENABLED ? "opacity-50" : ""
+          }`}
+        >
           {/* Track spans the full 0–100 so the thumb sits where the number
               actually falls; handleThresholdChange clamps a drag below the
               floor back up to it. Setting min={MIN_FLAG_THRESHOLD} would park
@@ -115,7 +144,7 @@ export function ProfileSettings() {
             max={MAX_FLAG_THRESHOLD}
             step={5}
             value={threshold}
-            disabled={analysisOff}
+            disabled={analysisOff || !THRESHOLD_PICKER_ENABLED}
             onChange={(e) => handleThresholdChange(Number(e.target.value))}
             aria-label="Flag threshold"
             className="w-40 accent-violet-600 sm:w-48"

@@ -1,7 +1,11 @@
 import Anthropic from "@anthropic-ai/sdk"
 import { prisma } from "@/lib/db"
 import { DEFAULT_MODEL, DEFAULT_FLAG_THRESHOLD } from "@/lib/settings"
-import { formatSignals, type FingerprintSignals } from "@/lib/fingerprint-server"
+import {
+  formatDerivedSignals,
+  formatSignals,
+  type FingerprintSignals,
+} from "@/lib/fingerprint-server"
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
@@ -54,6 +58,21 @@ appear was not measured — treat it as unknown, and do NOT read its absence as 
 either way. Judge on the signals present plus the device characteristics.
 If the whole block is absent, verification was unavailable and the fingerprint fields are \
 client-reported and unverified; be somewhat more cautious about treating a clean match as proof.
+
+LOCALLY DERIVED SIGNALS: A separate 'LOCALLY DERIVED SIGNALS' block, when present, was \
+worked out by this application from its own records. It did NOT come from Fingerprint's \
+server API and carries less weight than the server-verified block above, though more than \
+the client-reported fingerprint fields, since the client does not control it:
+- Verification downgraded from established session = yes means this session started under \
+server-verified identification and this fingerprint reports one that cannot be verified — \
+treat this as evasion evidence and raise the score, not as a benign mode change.
+- Client-reported component failed its shape check = yes means a reported OS, browser, screen \
+resolution, or timezone did not look like a real device value and was replaced before reaching \
+this prompt — a client reporting components that match no real device is misreporting, which is \
+itself an indicator, though a weaker one than the signals above since it can also result from a \
+misconfigured or unusual browser.
+This block appearing on its own, with no server-verified block, means verification was \
+unavailable for this fingerprint — which is itself what the downgrade signal is reporting.
 
 CONFIDENCE SCORE CALIBRATION:
 - 0–20: clearly benign — same device characteristics, only visitor ID or IP differs
@@ -109,7 +128,12 @@ function formatFingerprint(fp: {
     `  Browser: ${sanitize(fp.browser)}`,
     `  Screen Resolution: ${sanitize(fp.screenRes)}`,
     `  Timezone: ${sanitize(fp.timezone)}`,
-    `  User-Agent: ${sanitize(fp.userAgent, 400)}`,
+    // 400 chars was the largest interpolated field and, whenever server
+    // verification is unavailable, comes straight from the request header
+    // with no shape validation at all (unlike os/browser/screenRes/timezone,
+    // which are). OS and browser already carry the same information in a
+    // bounded, validated form, so this only needs to be short.
+    `  User-Agent: ${sanitize(fp.userAgent, 120)}`,
   ].join("\n")
 }
 
@@ -119,24 +143,40 @@ export async function analyzeDetectionEvent(
   flagThreshold: number = DEFAULT_FLAG_THRESHOLD,
   signals?: FingerprintSignals,
 ): Promise<void> {
-  const event = await prisma.detectionEvent.findUnique({
-    where: { id: eventId },
-    include: {
-      session: {
-        include: {
-          fingerprints: { orderBy: { createdAt: "asc" } },
-        },
-      },
-    },
-  })
+  // Read components directly off the event — they're denormalized onto it at
+  // creation time precisely so this doesn't need to join through Session ->
+  // Fingerprint, a chain that can go sessionId-null out from under a sign-out.
+  const event = await prisma.detectionEvent.findUnique({ where: { id: eventId } })
   if (!event) return
 
-  const original = event.session.fingerprints.find((fp) => fp.isOriginal)
-  const newest = event.session.fingerprints.find(
-    (fp) => fp.visitorId === event.newVisitorId,
-  )
+  const original = {
+    visitorId: event.originalVisitorId,
+    ip: event.originalIp,
+    os: event.originalOs,
+    browser: event.originalBrowser,
+    screenRes: event.originalScreenRes,
+    timezone: event.originalTimezone,
+    userAgent: event.originalUserAgent,
+  }
+  const newest = {
+    visitorId: event.newVisitorId,
+    ip: event.newIp,
+    os: event.newOs,
+    browser: event.newBrowser,
+    screenRes: event.newScreenRes,
+    timezone: event.newTimezone,
+    userAgent: event.newUserAgent,
+  }
 
   const model = modelOverride ?? process.env.ANTHROPIC_MODEL ?? DEFAULT_MODEL
+
+  // Two blocks, never one. The signals object also carries flags this app
+  // derived for itself (downgrade, shape anomaly), and those can be set when no
+  // server lookup happened at all — folding them into the server-verified block
+  // would tell the model that Fingerprint observed something it never saw, under
+  // a heading the system prompt instructs it to trust above everything else.
+  const serverBlock = signals?.serverVerified ? formatSignals(signals) : ""
+  const derivedBlock = signals ? formatDerivedSignals(signals) : ""
 
   const response = await anthropic.messages.create({
     model,
@@ -147,11 +187,14 @@ export async function analyzeDetectionEvent(
         role: "user",
         content:
           `ORIGINAL FINGERPRINT (established the session):\n` +
-          (original ? formatFingerprint(original) : `  Visitor ID: ${sanitize(event.originalVisitorId)}\n  IP: ${sanitize(event.originalIp)}`) +
+          formatFingerprint(original) +
           `\n\nNEW FINGERPRINT (accessing the same session):\n` +
-          (newest ? formatFingerprint(newest) : `  Visitor ID: ${sanitize(event.newVisitorId)}\n  IP: ${sanitize(event.newIp)}`) +
-          (signals
-            ? `\n\nSERVER-VERIFIED SIGNALS (from Fingerprint's server API, for the new fingerprint):\n${formatSignals(signals)}`
+          formatFingerprint(newest) +
+          (serverBlock
+            ? `\n\nSERVER-VERIFIED SIGNALS (from Fingerprint's server API, for the new fingerprint):\n${serverBlock}`
+            : "") +
+          (derivedBlock
+            ? `\n\nLOCALLY DERIVED SIGNALS (worked out by this application, not from Fingerprint):\n${derivedBlock}`
             : "") +
           `\n\nComponent similarity score: ${event.similarityScore.toFixed(2)} (0=completely different, 1=identical)\n\n` +
           "Analyze whether this represents a session hijack or a false positive (e.g. incognito browsing, fingerprint drift).",
