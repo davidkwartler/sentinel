@@ -253,4 +253,67 @@ describe('runDetection', () => {
 
     expect(result.downgraded).toBe(false)
   })
+
+  describe('impossible travel', () => {
+    function mockPair(original: Parameters<typeof fingerprintRow>[0]) {
+      prismaMock.fingerprint.findFirst.mockResolvedValue(
+        fingerprintRow({ visitorId: 'fp-original', ...original }),
+      )
+      prismaMock.detectionEvent.create.mockResolvedValue(
+        detectionEventRow({ id: 'event-travel' }),
+      )
+    }
+
+    it('reports the distance with the summed accuracy radii', async () => {
+      mockPair({ ipLatitude: 30.2671, ipLongitude: -97.7431, ipAccuracyRadius: 20 })
+
+      const result = await runDetection(prismaMock, {
+        sessionId: 'sess-1',
+        userId: 'user-1',
+        newVisitorId: 'fp-new',
+        newIp: '9.9.9.9',
+        ipLatitude: 52.3676,
+        ipLongitude: 4.9041,
+        ipAccuracyRadius: 50,
+      })
+
+      expect(result.ipDistanceKm).toBeGreaterThan(8000)
+      expect(result.ipDistanceUncertaintyKm).toBe(70)
+    })
+
+    it('reports no uncertainty rather than zero when a radius is missing', async () => {
+      // 0 would read as perfect precision and turn any distance into travel.
+      mockPair({ ipLatitude: 30.2671, ipLongitude: -97.7431, ipAccuracyRadius: null })
+
+      const result = await runDetection(prismaMock, {
+        sessionId: 'sess-1',
+        userId: 'user-1',
+        newVisitorId: 'fp-new',
+        newIp: '9.9.9.9',
+        ipLatitude: 30.3,
+        ipLongitude: -97.8,
+        ipAccuracyRadius: 20,
+      })
+
+      expect(result.ipDistanceKm).not.toBeNull()
+      expect(result.ipDistanceUncertaintyKm).toBeNull()
+    })
+
+    it('leaves both null when only one side resolved coordinates', async () => {
+      mockPair({ ipLatitude: null, ipLongitude: null, ipAccuracyRadius: null })
+
+      const result = await runDetection(prismaMock, {
+        sessionId: 'sess-1',
+        userId: 'user-1',
+        newVisitorId: 'fp-new',
+        newIp: '9.9.9.9',
+        ipLatitude: 52.3676,
+        ipLongitude: 4.9041,
+        ipAccuracyRadius: 50,
+      })
+
+      expect(result.ipDistanceKm).toBeNull()
+      expect(result.ipDistanceUncertaintyKm).toBeNull()
+    })
+  })
 })
