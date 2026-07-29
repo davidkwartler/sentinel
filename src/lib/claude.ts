@@ -64,9 +64,12 @@ blocklist hit.
 concealed. Weigh it like the datacenter signal: a session that established on an ordinary \
 consumer connection and returns over Tor is a strong replay indicator. Be careful in the other \
 direction though — a session conducted over Tor throughout is a privacy-conscious user, not an \
-attacker, so it is the CHANGE that carries the evidence, not Tor itself. Note also that Tor \
-relays the connection, so IP geolocation, distance, and ASN all describe the exit node rather \
-than the person; discount them rather than reading them as travel.
+attacker, so it is the CHANGE that carries the evidence, not Tor itself. This signal is \
+reported for the NEW fingerprint only — there is no Tor verdict for the original, so judge the \
+change from the original's Network line where one is shown, and where none is shown say the \
+baseline is unknown rather than assuming Tor throughout. Note also that Tor relays the \
+connection, so IP geolocation, distance, and ASN all describe the exit node rather than the \
+person; discount them rather than reading them as travel.
 - Browser timezone disagrees with its IP's timezone = yes means the browser's self-reported \
 timezone does not match where its IP actually is. That is expected under a VPN and suspicious \
 without one, so read it together with the VPN signal rather than alone.
@@ -106,7 +109,10 @@ misconfigured or unusual browser.
 does not depend on the browser's self-reported timezone. It is always reported with a combined \
 accuracy radius: IP geolocation resolves to tens of kilometres, so a distance at or below that \
 radius is NOT evidence of movement and must not be described as travel. A distance far beyond \
-it, over a short interval, is impossible travel and is decisive.
+it, over a short interval, is impossible travel and is decisive — EXCEPT where the Tor exit \
+node signal is present and yes, which means the coordinates locate the exit node rather than \
+the person and the distance is not evidence of movement at all. Check that signal before \
+calling a distance decisive.
 This block appearing on its own, with no server-verified block, means verification was \
 unavailable for this fingerprint — which is itself what the downgrade signal is reporting.
 

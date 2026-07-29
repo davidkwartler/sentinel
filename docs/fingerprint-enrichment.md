@@ -125,9 +125,9 @@ traffic — present, and still not worth reading.
 > **Corrected.** `tor` was in that do-not-build list too, on the same reasoning,
 > and that was wrong twice over: it is returned, and it is the only source for
 > the fact, since the blocklist detail it was assumed to duplicate is the phantom
-> above. It is worth reading, and is the one addition the availability table
-> below recommends. That table is the authoritative account of what arrives;
-> this section is the design rationale that predates the live capture.
+> above. It is now read, as `torExitNode`. That table is the authoritative
+> account of what arrives; this section is the design rationale that predates
+> the live capture.
 
 The remainder are cheap to add once the storage exists — they render through the
 existing `formatSignals()` mechanism, and each one that comes back non-null is a
@@ -465,7 +465,7 @@ live capture from `/products` in production.
 | `suspectScore` | yes | 0 on this event |
 | `highActivity` | yes | boolean |
 | `incognito` | **absent** | confirmed absent — see below |
-| `tor` | **yes** | present and unread, IP-derived — worth adding, see below |
+| `tor` | **yes** | IP-derived and applicable to browsers — now read as `torExitNode`, see below |
 | `mitmAttack`, `locationSpoofing` | yes | present but mobile-only semantics; never fire for browser traffic |
 | `developerTools`, `privacySettings`, `rawDeviceAttributes`, `remoteControl`, `virtualMachine` | absent | web-relevant, not returned |
 | `clonedApp`, `emulator`, `factoryReset`, `frida`, `rootApps` | returned | mobile-only semantics; present in the payload but meaningless for the JS agent |
