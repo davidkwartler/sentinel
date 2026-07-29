@@ -1,9 +1,13 @@
 # Fingerprint data enrichment
 
 Sentinel resolves a full identification event from Fingerprint's Server API on
-every Pro capture, reads five of its twenty-six products, and discards the rest
+every Pro capture, reads five of its nineteen products, and discards the rest
 before the response leaves `verifyFingerprint()`. This spec covers keeping that
 data, feeding the relevant parts to Claude, and exposing it in the UI.
+
+Written before the plan's actual product list was confirmed, so the counts below
+were revised downward once a live event was captured. Where a section and the
+availability table disagree, the table is right.
 
 ## The problem
 
