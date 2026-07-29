@@ -39,6 +39,14 @@ replay are strong evidence of active evasion. `tor`, `proxy`, `remoteControl`,
 the same response and never reach it. The model is asked to reason about evasion
 with most of the evasion evidence withheld.
 
+> **Corrected.** Both paragraphs above are kept as the original problem
+> statement — the counts describe what Sentinel read before any of this work
+> landed, and that history is the point. But the list of what the response
+> *carries* was taken from a dashboard sample and is wrong: `developerTools`,
+> `jailbroken`, `privacySettings`, `rawDeviceAttributes`, `remoteControl`, and
+> `virtualMachine` do not arrive at all. Nineteen keys arrive, not twenty-six.
+> See the availability table below, which supersedes this list.
+
 Within `identification` the same thing happens one level down: `ipLocation`,
 `firstSeenAt`, `lastSeenAt`, `visitorFound`, `suspect`, and `linkedId` are all
 dropped, as are `browserDetails.device`, `.osVersion`, and `.browserFullVersion`.
@@ -96,16 +104,30 @@ point about where model reasoning adds value over rules.
 
 Alongside it, the evasion products this workspace actually receives — confirmed
 against a live event, see the availability table below: `proxy`, `ipBlocklist`
-(which carries `tor_node` and `attack_source`), and `highActivity`.
+(which carries `emailSpam` and `attackSource`, and nothing else), and
+`highActivity`.
 
-Do not build for `tor`, `remoteControl`, `developerTools`, `virtualMachine`,
-`locationSpoofing`, or `mitmAttack` as separate products. An earlier draft of
-this spec listed them; the sampled event does not return them, and the mobile-only
-ones never will for a JS agent.
+> **Corrected.** This paragraph previously credited `ipBlocklist.details` with a
+> `tor_node` field. There is no such field — the Server API schema gives
+> `IPBlocklistDetails` exactly two members, `emailSpam` and `attackSource`. The
+> phantom field is why the next paragraph originally said not to build for `tor`
+> separately: it looked redundant with a blocklist detail that did not exist.
 
-These are cheap to add once the storage exists — they render through the existing
-`formatSignals()` mechanism, and each one that comes back non-null is a line the
-model can use.
+`remoteControl`, `developerTools`, and `virtualMachine` are genuinely absent from
+the payload, so there is nothing to build for. `locationSpoofing` and `mitmAttack`
+*are* returned, but both carry mobile-SDK semantics and never fire for browser
+traffic — present, and still not worth reading.
+
+> **Corrected.** `tor` was in that do-not-build list too, on the same reasoning,
+> and that was wrong twice over: it is returned, and it is the only source for
+> the fact, since the blocklist detail it was assumed to duplicate is the phantom
+> above. It is worth reading, and is the one addition the availability table
+> below recommends. That table is the authoritative account of what arrives;
+> this section is the design rationale that predates the live capture.
+
+The remainder are cheap to add once the storage exists — they render through the
+existing `formatSignals()` mechanism, and each one that comes back non-null is a
+line the model can use.
 
 ## Design
 
@@ -292,14 +314,18 @@ the request: Fingerprint's edge via A records, or a Worker on our own zone.
 **Recommendation: custom subdomain first.** It is isolated — new records for a
 new name, nothing about how `sentinel.davidkwartler.com` is served changes, and
 nothing can break the running site. It needs no Workers account and no route
-configuration, and the setup is three DNS records against a Worker plus routes
-plus a proxied record. One of the setup guide's caveats is already cleared: the
-domain has no CAA records to conflict with.
+configuration: three DNS records, against a Worker plus routes plus a proxied
+record for the Cloudflare variant. One of the setup guide's caveats is already
+cleared: the domain has no CAA records to conflict with.
 
-The Cloudflare route stays the upgrade path, and the Safari cookie cap below is
-the reason it might eventually be worth taking — a Worker on our own zone is not
-a CNAME to a third party, which is what ITP's heuristic keys on. Unverified, and
-it would need testing before it justified the move.
+The Cloudflare route stays the upgrade path, but the Safari argument for taking
+it does not survive the correction above. The reasoning was that a Worker on our
+own zone is not a CNAME to a third party, which is what ITP's CNAME-cloaking
+heuristic keys on — except the path we are actually running is A records to
+Fingerprint's edge, not a CNAME, so that heuristic is not what would be capping
+us in the first place. Whatever Safari does to `observatory` cookies, moving to a
+Worker is not obviously the fix. Both halves of this are unverified and would
+need testing before either justified the move.
 
 ### Decided: `observatory.davidkwartler.com`
 
@@ -431,7 +457,7 @@ live capture from `/products` in production.
 | `proxy` | yes | boolean, confidence, ML score |
 | `tampering` | yes | boolean, confidence, ML score, anomaly score, anti-detect flag |
 | `botd` | yes | `not_detected` |
-| `ipBlocklist` | yes | `email_spam`, `attack_source`, `tor_node` |
+| `ipBlocklist` | yes | `emailSpam`, `attackSource` — those two and nothing else |
 | `suspectScore` | yes | 0 on this event |
 | `highActivity` | yes | boolean |
 | `incognito` | **absent** | confirmed absent — see below |
@@ -439,6 +465,7 @@ live capture from `/products` in production.
 | `mitmAttack`, `locationSpoofing` | yes | present but mobile-only semantics; never fire for browser traffic |
 | `developerTools`, `privacySettings`, `rawDeviceAttributes`, `remoteControl`, `virtualMachine` | absent | web-relevant, not returned |
 | `clonedApp`, `emulator`, `factoryReset`, `frida`, `rootApps` | returned | mobile-only semantics; present in the payload but meaningless for the JS agent |
+| `jailbroken` | absent | mobile-only, and unlike its neighbours above it does not arrive at all |
 | `proximity` | empty | key present, no data |
 
 Two things about that table matter more than the rest.

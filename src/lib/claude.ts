@@ -46,8 +46,6 @@ device-characteristic changes compound quickly.
 SERVER-VERIFIED SIGNALS: When a 'SERVER-VERIFIED SIGNALS' block is present, those \
 values came from Fingerprint's server API, not from the browser — they are trustworthy \
 and outrank the fingerprint fields. Use them decisively:
-- Incognito = yes largely explains a changed visitor ID on an otherwise identical device — \
-lower the score substantially.
 - VPN = yes explains an IP and timezone change without implying a different device — \
 discount those two signals and judge on device characteristics alone.
 - Bot detected, tampering/anti-detect browser, or request ID replayed = yes are strong \

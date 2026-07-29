@@ -106,8 +106,12 @@ describe('analyzeDetectionEvent', () => {
     await analyzeDetectionEvent('event-1')
 
     const system = mockCreate.mock.calls[0][0].system
-    expect(system).not.toMatch(/consistent with incognito/i)
-    expect(system).not.toMatch(/incognito or storage reset/i)
+    // Assert on the word, not on the two phrasings that happened to carry the
+    // problem. A narrower matcher passed while the SERVER-VERIFIED block still
+    // told the model that "Incognito = yes largely explains a changed visitor
+    // ID ... lower the score substantially" — the same instruction in a
+    // different sentence.
+    expect(system).not.toMatch(/incognito/i)
     // The observable pattern must still be described, just without naming a
     // cause this plan cannot measure.
     expect(system).toMatch(/fresh browser state/i)
