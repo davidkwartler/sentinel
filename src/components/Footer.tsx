@@ -75,7 +75,15 @@ export function Footer() {
         <p className="whitespace-nowrap text-gray-500">
           {/* No "All rights reserved" — the repo is MIT licensed, and the
               phrase claims the opposite of what LICENSE grants. */}
-          &copy; {new Date().getFullYear()} David Kwartler
+          &copy; {new Date().getFullYear()}{" "}
+          <a
+            href="https://davidkwartler.com"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="underline underline-offset-2 transition-colors hover:text-gray-900 focus-visible:text-gray-900 focus-visible:outline-none"
+          >
+            David Kwartler
+          </a>
         </p>
       </div>
     </footer>
