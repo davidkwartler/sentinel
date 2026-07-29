@@ -389,6 +389,27 @@ identification `POST` go to `observatory.davidkwartler.com`, and that no
 controlled by different variables (`SCRIPT_URL` and `ENDPOINT`) and fail
 independently, so confirming one says nothing about the other.
 
+Confirmed in production on 2026-07-28. Three requests, all on the subdomain and
+all resolving to one of the A records added above:
+
+```
+GET  /web/v3/<apiKey>/loader_v3.12.7.js      → 200   the loader, from SCRIPT_URL
+GET  /7xy9vu-/C5Hha?q=<apiKey>               → 200   the agent bundle
+POST /?ci=js/3.12.13&q=<apiKey>              → 200   identification, from ENDPOINT
+                                    Remote Address: 162.159.141.170:443
+```
+
+The middle one is worth recognising. Fingerprint randomises the agent request
+paths on a custom subdomain so a blocklist cannot pattern-match them, which is
+the same reasoning that drove the hostname choice — expect an opaque path there
+rather than anything resembling `fingerprint` or `fpjs`. Note also that the
+loader package version and the agent bundle version differ (`3.12.7` against
+`js/3.12.13`); the loader fetches whatever agent is current, and that is normal
+rather than a version skew worth chasing.
+
+A 200 on the POST is the conclusive result: the primary endpoint answered, so
+the fallback never engaged.
+
 The Safari trade-off is worth understanding rather than dismissing: it interacts
 with `firstSeenAt` and `visitorFound`, recommended above as a top-four signal.
 A 7-day cookie cap means Safari visitors look new more often than they are.
