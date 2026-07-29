@@ -1,9 +1,13 @@
 # Fingerprint data enrichment
 
 Sentinel resolves a full identification event from Fingerprint's Server API on
-every Pro capture, reads five of its twenty-six products, and discards the rest
+every Pro capture, reads five of its nineteen products, and discards the rest
 before the response leaves `verifyFingerprint()`. This spec covers keeping that
 data, feeding the relevant parts to Claude, and exposing it in the UI.
+
+Written before the plan's actual product list was confirmed, so the counts below
+were revised downward once a live event was captured. Where a section and the
+availability table disagree, the table is right.
 
 ## The problem
 
@@ -38,6 +42,14 @@ replay are strong evidence of active evasion. `tor`, `proxy`, `remoteControl`,
 `developerTools`, `virtualMachine`, `locationSpoofing`, and `ipBlocklist` are in
 the same response and never reach it. The model is asked to reason about evasion
 with most of the evasion evidence withheld.
+
+> **Corrected.** Both paragraphs above are kept as the original problem
+> statement — the counts describe what Sentinel read before any of this work
+> landed, and that history is the point. But the list of what the response
+> *carries* was taken from a dashboard sample and is wrong: `developerTools`,
+> `jailbroken`, `privacySettings`, `rawDeviceAttributes`, `remoteControl`, and
+> `virtualMachine` do not arrive at all. Nineteen keys arrive, not twenty-six.
+> See the availability table below, which supersedes this list.
 
 Within `identification` the same thing happens one level down: `ipLocation`,
 `firstSeenAt`, `lastSeenAt`, `visitorFound`, `suspect`, and `linkedId` are all
@@ -96,16 +108,30 @@ point about where model reasoning adds value over rules.
 
 Alongside it, the evasion products this workspace actually receives — confirmed
 against a live event, see the availability table below: `proxy`, `ipBlocklist`
-(which carries `tor_node` and `attack_source`), and `highActivity`.
+(which carries `emailSpam` and `attackSource`, and nothing else), and
+`highActivity`.
 
-Do not build for `tor`, `remoteControl`, `developerTools`, `virtualMachine`,
-`locationSpoofing`, or `mitmAttack` as separate products. An earlier draft of
-this spec listed them; the sampled event does not return them, and the mobile-only
-ones never will for a JS agent.
+> **Corrected.** This paragraph previously credited `ipBlocklist.details` with a
+> `tor_node` field. There is no such field — the Server API schema gives
+> `IPBlocklistDetails` exactly two members, `emailSpam` and `attackSource`. The
+> phantom field is why the next paragraph originally said not to build for `tor`
+> separately: it looked redundant with a blocklist detail that did not exist.
 
-These are cheap to add once the storage exists — they render through the existing
-`formatSignals()` mechanism, and each one that comes back non-null is a line the
-model can use.
+`remoteControl`, `developerTools`, and `virtualMachine` are genuinely absent from
+the payload, so there is nothing to build for. `locationSpoofing` and `mitmAttack`
+*are* returned, but both carry mobile-SDK semantics and never fire for browser
+traffic — present, and still not worth reading.
+
+> **Corrected.** `tor` was in that do-not-build list too, on the same reasoning,
+> and that was wrong twice over: it is returned, and it is the only source for
+> the fact, since the blocklist detail it was assumed to duplicate is the phantom
+> above. It is worth reading, and is the one addition the availability table
+> below recommends. That table is the authoritative account of what arrives;
+> this section is the design rationale that predates the live capture.
+
+The remainder are cheap to add once the storage exists — they render through the
+existing `formatSignals()` mechanism, and each one that comes back non-null is a
+line the model can use.
 
 ## Design
 
@@ -271,15 +297,39 @@ one to qualify for.
 There is a catch. `sentinel.davidkwartler.com` currently resolves to Vercel's own
 addresses (`216.198.79.65`, `64.29.17.65`) rather than Cloudflare's, so that
 record is DNS-only — grey cloud. A Cloudflare Worker cannot intercept traffic
-that never passes through Cloudflare's edge, so the integration requires
-proxying the hostname first. That puts Cloudflare in front of Vercel
-permanently, needs SSL mode on Full (strict) to avoid a redirect loop, and
-changes the caching path for the live site.
+that never passes through Cloudflare's edge.
+
+An earlier draft of this section concluded that the integration therefore
+requires proxying `sentinel.davidkwartler.com` itself, putting Cloudflare in
+front of Vercel permanently. **That is wrong**, and the error is worth recording
+rather than quietly deleting, because it made the Cloudflare row look more
+expensive than it is. Fingerprint's guide documents a DNS-only path: host the
+worker on a *separate* subdomain that is proxied, and the main hostname is never
+touched. No Cloudflare in front of Vercel, no SSL mode change, no new caching
+path for the live site.
+
+What that path does cost is the advantage the table credits it with. On a
+proxied subdomain the requests go to `observatory.davidkwartler.com`, not
+`sentinel.davidkwartler.com`, so it is no longer same-origin — the column above
+describes the proxy-the-main-hostname variant, not the one we would actually
+run. Both options collapse to a subdomain, differing mainly in who terminates
+the request: Fingerprint's edge via A records, or a Worker on our own zone.
 
 **Recommendation: custom subdomain first.** It is isolated — new records for a
 new name, nothing about how `sentinel.davidkwartler.com` is served changes, and
-nothing can break the running site. One of the setup guide's caveats is already
+nothing can break the running site. It needs no Workers account and no route
+configuration: three DNS records, against a Worker plus routes plus a proxied
+record for the Cloudflare variant. One of the setup guide's caveats is already
 cleared: the domain has no CAA records to conflict with.
+
+The Cloudflare route stays the upgrade path, but the Safari argument for taking
+it does not survive the correction above. The reasoning was that a Worker on our
+own zone is not a CNAME to a third party, which is what ITP's CNAME-cloaking
+heuristic keys on — except the path we are actually running is A records to
+Fingerprint's edge, not a CNAME, so that heuristic is not what would be capping
+us in the first place. Whatever Safari does to `observatory` cookies, moving to a
+Worker is not obviously the fix. Both halves of this are unverified and would
+need testing before either justified the move.
 
 ### Decided: `observatory.davidkwartler.com`
 
@@ -311,10 +361,11 @@ never in a screenshot or the README. Nothing about the name needs to explain
 itself to a reader, which is why legibility to a blocklist mattered more than
 legibility to a person.
 
-### Remaining steps
+### Setup, completed 2026-07-28
 
-The code side is already done and merged behind env vars, so this is
-configuration only:
+Steps 1–3 are done and verified; step 4 is the standing check. Kept as a record
+of what was actually run, and see the note after step 4 for the one part that
+was surprising.
 
 1. Fingerprint dashboard, Settings > Subdomains > New subdomain:
    `observatory.davidkwartler.com`. It cannot be edited afterwards.
@@ -338,6 +389,57 @@ configuration only:
    rather than showing the "Pro unavailable" chip, and a new `Fingerprint` row
    should land with `verification = 'verified'`.
 
+**Expect a 403 between steps 2 and 3.** Once the records resolve, and before
+Fingerprint finishes provisioning the certificate, `observatory` returns
+Cloudflare **Error 1000, "DNS points to prohibited IP"**. The reason is that the
+A records Fingerprint issues are themselves Cloudflare addresses
+(`162.159.141.170`, `172.66.1.166`), and until Fingerprint's Cloudflare for SaaS
+hostname goes active, the request falls through to our own zone — which is on
+Cloudflare and refuses to serve a record pointing at Cloudflare IPs. It is not a
+misconfiguration and the grey-cloud setting is not the cause; both were verified
+correct while the error was still showing.
+
+Distinguish it by certificate. During provisioning the hostname serves this
+zone's Universal SSL wildcard:
+
+```
+subject=CN=davidkwartler.com   SAN: davidkwartler.com, *.davidkwartler.com
+```
+
+When it clears, the subject becomes `CN=observatory.davidkwartler.com` and the
+403 goes with it. In this setup that took minutes, not the documented 24 hours.
+
+**Verifying it is actually in use.** The database cannot tell you. A row landing
+with `verification = 'verified'` proves the Pro path worked, but the endpoint
+fallback added alongside this change (`[observatory, defaultEndpoint]`) means a
+silent fall back to Fingerprint's own endpoints produces an identical row. Only
+the browser can answer it — check that both the loader `GET` and the
+identification `POST` go to `observatory.davidkwartler.com`, and that no
+`fpnpmcdn.net` or `api.fpjs.io` request appears beside them. The two are
+controlled by different variables (`SCRIPT_URL` and `ENDPOINT`) and fail
+independently, so confirming one says nothing about the other.
+
+Confirmed in production on 2026-07-28. Three requests, all on the subdomain and
+all resolving to one of the A records added above:
+
+```
+GET  /web/v3/<apiKey>/loader_v3.12.7.js      → 200   the loader, from SCRIPT_URL
+GET  /7xy9vu-/C5Hha?q=<apiKey>               → 200   the agent bundle
+POST /?ci=js/3.12.13&q=<apiKey>              → 200   identification, from ENDPOINT
+                                    Remote Address: 162.159.141.170:443
+```
+
+The middle one is worth recognising. Fingerprint randomises the agent request
+paths on a custom subdomain so a blocklist cannot pattern-match them, which is
+the same reasoning that drove the hostname choice — expect an opaque path there
+rather than anything resembling `fingerprint` or `fpjs`. Note also that the
+loader package version and the agent bundle version differ (`3.12.7` against
+`js/3.12.13`); the loader fetches whatever agent is current, and that is normal
+rather than a version skew worth chasing.
+
+A 200 on the POST is the conclusive result: the primary endpoint answered, so
+the fallback never engaged.
+
 The Safari trade-off is worth understanding rather than dismissing: it interacts
 with `firstSeenAt` and `visitorFound`, recommended above as a top-four signal.
 A 7-day cookie cap means Safari visitors look new more often than they are.
@@ -359,28 +461,65 @@ live capture from `/products` in production.
 | `proxy` | yes | boolean, confidence, ML score |
 | `tampering` | yes | boolean, confidence, ML score, anomaly score, anti-detect flag |
 | `botd` | yes | `not_detected` |
-| `ipBlocklist` | yes | `email_spam`, `attack_source`, `tor_node` |
+| `ipBlocklist` | yes | `emailSpam`, `attackSource` — those two and nothing else |
 | `suspectScore` | yes | 0 on this event |
 | `highActivity` | yes | boolean |
-| `incognito` | **absent** | see below — the app already depends on this |
-| `developerTools`, `locationSpoofing`, `mitmAttack`, `privacySettings`, `rawDeviceAttributes`, `remoteControl`, `virtualMachine`, `tor` | absent | web-relevant, not returned |
-| `clonedApp`, `emulator`, `factoryReset`, `frida`, `jailbroken`, `rootApps`, `proximity` | absent | mobile-only, not applicable to the JS agent |
+| `incognito` | **absent** | confirmed absent — see below |
+| `tor` | **yes** | present and unread, IP-derived — worth adding, see below |
+| `mitmAttack`, `locationSpoofing` | yes | present but mobile-only semantics; never fire for browser traffic |
+| `developerTools`, `privacySettings`, `rawDeviceAttributes`, `remoteControl`, `virtualMachine` | absent | web-relevant, not returned |
+| `clonedApp`, `emulator`, `factoryReset`, `frida`, `rootApps` | returned | mobile-only semantics; present in the payload but meaningless for the JS agent |
+| `jailbroken` | absent | mobile-only, and unlike its neighbours above it does not arrive at all |
+| `proximity` | empty | key present, no data |
 
 Two things about that table matter more than the rest.
 
-**`incognito` is absent, and the prompt leans on it heavily.** The system prompt
-tells Claude that incognito "largely explains a changed visitor ID on an
-otherwise identical device — lower the score substantially," and lists incognito
-first among false positives to watch for. It is the single most useful
-false-positive discriminator this app has, and it may not be on the plan. Every
-other boolean in the sample came back explicitly `false` rather than being
-omitted, so absence here is probably real rather than a payload-shape artifact —
-but confirm before acting on it. If it genuinely is unavailable, that reshapes
-the prompt more than any addition below.
+**`incognito` is absent — confirmed, and the prompt has been corrected.**
+Re-checked on 2026-07-29 against a stored `rawEvent` from a live Server API
+capture, not the dashboard sample: nineteen product keys, no `incognito` among
+them. So it is a plan limit, not a payload-shape artifact.
 
-**The absent list is mostly not a plan limit.** Seven of those products only
-exist for mobile SDKs; the JS agent would never return them at any tier. Do not
-build UI or prompt lines for them.
+The mapping in `verifyFingerprint` is harmless — it resolves null and
+`formatSignals` omits the line, so nothing false reaches the model. The problem
+was in `claude.ts`, which carried a worked calibration example whose reasoning
+read "consistent with incognito or storage reset on the same device." That
+taught the model to explain away a changed visitor ID using evidence it can
+never receive, and the direction of that error is under-flagging — treating a
+real hijack as benign private browsing, which is the worse failure for a hijack
+detector. The example and the surrounding guidance now describe the observable
+pattern (identical characteristics, nothing else indicating a second device)
+without naming a cause this plan cannot measure.
+
+**Three products are present and unread, but only one is worth reading.** The
+earlier table listed `tor`, `mitmAttack`, and `locationSpoofing` as absent; that
+came from the dashboard/webhook sample, and the Server API disagrees. All three
+returned `{"result": false}` on the live event.
+
+Presence is not relevance, and the names mislead. Per the Server API schema:
+
+- `tor` — "true if the request IP address is a known tor exit node". IP-derived
+  and fully applicable to a browser. **Worth adding.** It is also the only
+  source: `ipBlocklist.details` carries `emailSpam` and `attackSource` and
+  nothing else, so the `tor_node` field an earlier draft of this document
+  attributed to it does not exist.
+- `locationSpoofing` — "the request came from a **mobile device** with location
+  spoofing enabled". This is device GPS spoofing on a mobile SDK, not IP
+  geolocation. It says nothing about whether the coordinates behind the
+  impossible-travel comparison are fabricated, and will not fire for browser
+  traffic. **Not applicable.**
+- `mitmAttack` — documented as "`false` … when the request originated from a
+  browser". **Not applicable.**
+
+Worth stating plainly because the reverse was briefly believed: the
+impossible-travel comparison has no Smart Signal backing it up. Its only defence
+against fabricated coordinates remains the accuracy radius reported beside every
+distance, plus the ASN and datacenter signals that would expose a hosting
+origin. That is a real limitation, not a gap this plan can close.
+
+**Mobile products are returned, not withheld.** `clonedApp`, `emulator`,
+`factoryReset`, `frida`, and `rootApps` all appear in the payload. They carry no
+meaning for a JS agent, so continue to ignore them — but the reason is
+semantics, not availability.
 
 ### The sample is in the wrong shape
 
