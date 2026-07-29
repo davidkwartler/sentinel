@@ -472,6 +472,19 @@ export async function verifyFingerprint(
     },
     rawEvent: stripComponents(event),
     signals: {
+      // Dormant: `incognito` is not on the current plan. Confirmed against a
+      // live event (2026-07-29), which carried nineteen products with no
+      // `incognito` key at all — so this always resolves null and formatSignals
+      // omits the line entirely. Kept because the mapping costs nothing and the
+      // signal returns the moment the plan includes it.
+      //
+      // The system prompt is the opposite call: its `Incognito = yes` bullet was
+      // deleted rather than left dormant, because prompt text is not inert the
+      // way an unread mapping is. It spends tokens on every request and primes
+      // the model toward an explanation the plan cannot evidence, and that error
+      // runs toward under-flagging. If incognito ever lands on the plan, restore
+      // a calibration bullet alongside it — the mapping and formatSignals will
+      // already be feeding the line through.
       incognito: products.incognito?.data?.result ?? null,
       vpn: products.vpn?.data?.result ?? null,
       bot: products.botd?.data?.bot?.result

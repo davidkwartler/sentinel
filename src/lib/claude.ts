@@ -26,8 +26,10 @@ was stolen and replayed — that is a session hijack. Do NOT flag 'using multipl
 suspicious on its own; what matters is that ONE cookie is being used from different devices.
 
 FALSE POSITIVES TO WATCH FOR:
-- Incognito/private browsing on the same device: produces a different visitor ID but shares \
-the same OS, browser, screen resolution, timezone, and usually the same IP.
+- A fresh browser state on the same device — private browsing, a cleared profile, or a \
+storage reset — produces a different visitor ID while OS, browser, screen resolution, \
+timezone, and usually the IP all stay the same. These are indistinguishable from one \
+another here, so describe the pattern you can see rather than asserting which one it was.
 - Browser updates or extension changes: may shift the visitor ID but device characteristics stay the same.
 - VPN or DHCP changes: IP changes but all device characteristics remain identical.
 
@@ -44,8 +46,6 @@ device-characteristic changes compound quickly.
 SERVER-VERIFIED SIGNALS: When a 'SERVER-VERIFIED SIGNALS' block is present, those \
 values came from Fingerprint's server API, not from the browser — they are trustworthy \
 and outrank the fingerprint fields. Use them decisively:
-- Incognito = yes largely explains a changed visitor ID on an otherwise identical device — \
-lower the score substantially.
 - VPN = yes explains an IP and timezone change without implying a different device — \
 discount those two signals and judge on device characteristics alone.
 - Bot detected, tampering/anti-detect browser, or request ID replayed = yes are strong \
@@ -112,11 +112,11 @@ CONFIDENCE SCORE CALIBRATION:
 
 CALIBRATED EXAMPLES:
 
-Example A — false positive (incognito on the same device):
+Example A — false positive (same device, fresh browser state):
   Original: OS Mac OS X, Browser Chrome, Screen 3024x1964, Timezone America/Chicago, IP 73.45.12.9
   New:      OS Mac OS X, Browser Chrome, Screen 3024x1964, Timezone America/Chicago, IP 73.45.12.9, different Visitor ID
   → confidenceScore ~10. Reasoning: 'Likely benign: • Identical OS, browser, screen, timezone, IP \
-• Only visitor ID changed — consistent with incognito or storage reset on the same device'
+• Visitor ID alone changed, with nothing else pointing to a second device'
 
 Example B — real hijack (cookie replayed on a different machine):
   Original: OS Mac OS X, Browser Chrome, Screen 3024x1964, Timezone America/Chicago, IP 73.45.12.9
@@ -236,7 +236,7 @@ export async function analyzeDetectionEvent(
             ? `\n\nLOCALLY DERIVED SIGNALS (worked out by this application, not from Fingerprint):\n${derivedBlock}`
             : "") +
           `\n\nComponent similarity score: ${event.similarityScore.toFixed(2)} (0=completely different, 1=identical)\n\n` +
-          "Analyze whether this represents a session hijack or a false positive (e.g. incognito browsing, fingerprint drift).",
+          "Analyze whether this represents a session hijack or a false positive (e.g. a fresh browser state or fingerprint drift on the same device).",
       },
     ],
     output_config: {

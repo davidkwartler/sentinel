@@ -11,6 +11,7 @@ vi.mock('@anthropic-ai/sdk', () => ({
 }))
 
 import { prismaMock } from '../__mocks__/db'
+import { detectionEventRow } from '@/test/fixtures'
 import { analyzeDetectionEvent } from '../claude'
 
 describe('analyzeDetectionEvent', () => {
@@ -83,6 +84,37 @@ describe('analyzeDetectionEvent', () => {
         status: 'FLAGGED',
       },
     })
+  })
+
+  it('never offers incognito as the explanation for a changed visitor ID', async () => {
+    // `incognito` is not on the Fingerprint plan — confirmed against a stored
+    // rawEvent from a live Server API capture, which carried nineteen products
+    // with no `incognito` key. The signal therefore never reaches the prompt.
+    //
+    // Guidance that reaches for it as a *cause* is worse than useless: it tells
+    // the model to explain away a changed visitor ID using evidence it can never
+    // receive, and that error runs toward under-flagging — a real hijack read as
+    // benign private browsing, the wrong direction for a hijack detector.
+    prismaMock.detectionEvent.findUnique.mockResolvedValue(
+      detectionEventRow({ id: 'event-1', originalOs: 'Mac OS', newOs: 'Mac OS' }) as any,
+    )
+    mockCreate.mockResolvedValue({
+      content: [{ type: 'text', text: JSON.stringify({ confidenceScore: 10, reasoning: '• benign' }) }],
+    })
+    prismaMock.detectionEvent.update.mockResolvedValue({} as any)
+
+    await analyzeDetectionEvent('event-1')
+
+    const system = mockCreate.mock.calls[0][0].system
+    // Assert on the word, not on the two phrasings that happened to carry the
+    // problem. A narrower matcher passed while the SERVER-VERIFIED block still
+    // told the model that "Incognito = yes largely explains a changed visitor
+    // ID ... lower the score substantially" — the same instruction in a
+    // different sentence.
+    expect(system).not.toMatch(/incognito/i)
+    // The observable pattern must still be described, just without naming a
+    // cause this plan cannot measure.
+    expect(system).toMatch(/fresh browser state/i)
   })
 
   it('updates event to CLEAR when confidence < 70', async () => {
