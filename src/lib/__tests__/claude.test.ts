@@ -117,6 +117,29 @@ describe('analyzeDetectionEvent', () => {
     expect(system).toMatch(/fresh browser state/i)
   })
 
+  it('subordinates the impossible-travel rule to the tor signal', async () => {
+    // These two instructions describe the same number and pull opposite ways:
+    // the Tor bullet says geolocation and distance describe the exit node and
+    // must be discounted, while the derived-signals bullet calls a large
+    // distance over a short interval decisive. A Tor circuit is routinely a
+    // transatlantic hop, so left unqualified the second one manufactures
+    // impossible travel out of every Tor session. Precedence has to be stated
+    // where the conflict is, not inferred from block ordering.
+    prismaMock.detectionEvent.findUnique.mockResolvedValue(
+      detectionEventRow({ id: 'event-1' }) as any,
+    )
+    mockCreate.mockResolvedValue({
+      content: [{ type: 'text', text: JSON.stringify({ confidenceScore: 10, reasoning: '• benign' }) }],
+    })
+    prismaMock.detectionEvent.update.mockResolvedValue({} as any)
+
+    await analyzeDetectionEvent('event-1')
+
+    const system = mockCreate.mock.calls[0][0].system
+    const distanceRule = system.slice(system.indexOf('Distance between the two IP locations'))
+    expect(distanceRule).toMatch(/is decisive[^.]*EXCEPT[^.]*Tor exit node/i)
+  })
+
   it('updates event to CLEAR when confidence < 70', async () => {
     prismaMock.detectionEvent.findUnique.mockResolvedValue({
       id: 'event-2',
