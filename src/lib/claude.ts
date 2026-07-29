@@ -60,6 +60,13 @@ the score substantially.
 - Request IP on a malicious-actor blocklist, or known for network attacks, is corroborating \
 evidence of the same kind. Treat 'known for network attacks' as stronger than a generic \
 blocklist hit.
+- Request IP is a known Tor exit node = yes means the request's origin is deliberately \
+concealed. Weigh it like the datacenter signal: a session that established on an ordinary \
+consumer connection and returns over Tor is a strong replay indicator. Be careful in the other \
+direction though — a session conducted over Tor throughout is a privacy-conscious user, not an \
+attacker, so it is the CHANGE that carries the evidence, not Tor itself. Note also that Tor \
+relays the connection, so IP geolocation, distance, and ASN all describe the exit node rather \
+than the person; discount them rather than reading them as travel.
 - Browser timezone disagrees with its IP's timezone = yes means the browser's self-reported \
 timezone does not match where its IP actually is. That is expected under a VPN and suspicious \
 without one, so read it together with the VPN signal rather than alone.

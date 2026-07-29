@@ -127,6 +127,14 @@ export interface FingerprintSignals {
   ipBlocklistAttackSource?: boolean | null
   /** Request came from a hosting provider rather than a consumer connection. */
   datacenter?: boolean | null
+  /**
+   * Request IP is a known Tor exit node. IP-derived, so unlike `mitmAttack` and
+   * `locationSpoofing` — which the same plan returns but which only carry
+   * meaning for mobile SDKs — this one applies to browser traffic. It is also
+   * the only source: `ipBlocklist.details` reports `emailSpam` and
+   * `attackSource` and nothing else.
+   */
+  torExitNode?: boolean | null
   highActivity?: boolean | null
   /** Has Fingerprint seen this visitor before this event? */
   visitorFound?: boolean | null
@@ -512,6 +520,7 @@ export async function verifyFingerprint(
       ipBlocklistAttackSource:
         products.ipBlocklist?.data?.details?.attackSource ?? null,
       datacenter: ipInfo?.datacenter?.result ?? null,
+      torExitNode: products.tor?.data?.result ?? null,
       highActivity: products.highActivity?.data?.result ?? null,
       visitorFound: identification.visitorFound ?? null,
       distinctIp: intervals(velocity?.distinctIp?.intervals),
@@ -589,6 +598,7 @@ export function formatSignals(signals: FingerprintSignals): string {
       ["Request IP on a malicious-actor blocklist", signals.ipBlocklisted],
       ["IP known for network attacks", signals.ipBlocklistAttackSource],
       ["IP from a datacenter/hosting provider rather than a consumer ISP", signals.datacenter],
+      ["Request IP is a known Tor exit node", signals.torExitNode],
       ["Visitor seen by Fingerprint before this event", signals.visitorFound],
       ["Unusually high request volume for this device", signals.highActivity],
     ]),

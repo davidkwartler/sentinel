@@ -498,9 +498,9 @@ returned `{"result": false}` on the live event.
 Presence is not relevance, and the names mislead. Per the Server API schema:
 
 - `tor` — "true if the request IP address is a known tor exit node". IP-derived
-  and fully applicable to a browser. **Worth adding.** It is also the only
-  source: `ipBlocklist.details` carries `emailSpam` and `attackSource` and
-  nothing else, so the `tor_node` field an earlier draft of this document
+  and fully applicable to a browser. **Now read** as `torExitNode`. It is also
+  the only source: `ipBlocklist.details` carries `emailSpam` and `attackSource`
+  and nothing else, so the `tor_node` field an earlier draft of this document
   attributed to it does not exist.
 - `locationSpoofing` — "the request came from a **mobile device** with location
   spoofing enabled". This is device GPS spoofing on a mobile SDK, not IP

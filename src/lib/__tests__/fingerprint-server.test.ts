@@ -214,6 +214,7 @@ describe('verifyFingerprint enrichment', () => {
         vpn: { data: { result: false, confidence: 'high', methods: { timezoneMismatch: false } } },
         tampering: { data: { result: false, confidence: 'high', mlScore: 0.0263, anomalyScore: 0, antiDetectBrowser: false } },
         highActivity: { data: { result: false } },
+        tor: { data: { result: true } },
       },
     }
   }
@@ -231,6 +232,16 @@ describe('verifyFingerprint enrichment', () => {
     expect(result?.details.asnName).toBe('Google Fiber Inc.')
     expect(result?.details.asnType).toBe('isp')
     expect(result?.signals.datacenter).toBe(false)
+  })
+
+  it('maps the tor exit node flag off its own product', async () => {
+    // `ipBlocklist.details` carries emailSpam and attackSource only, so the
+    // standalone `tor` product is the sole source for this.
+    mockGetEvent.mockResolvedValue(enrichedFixture())
+
+    const result = await verifyFingerprint('pro-request-id', { visitorId: 'server-visitor' })
+
+    expect(result?.signals.torExitNode).toBe(true)
   })
 
   it('maps device detail and visitor history', async () => {
@@ -284,6 +295,7 @@ describe('verifyFingerprint enrichment', () => {
     expect(result?.details.asn).toBeNull()
     expect(result?.signals.suspectScore).toBeNull()
     expect(result?.signals.datacenter).toBeNull()
+    expect(result?.signals.torExitNode).toBeNull()
   })
 })
 
@@ -554,6 +566,16 @@ describe('formatSignals enrichment', () => {
     expect(out).toContain('3 in 1hr')
     // Omitted above 20k events, so absence is a cap and must not read as zero
     expect(out).not.toContain('24hr')
+  })
+
+  it('reports a tor exit node, and stays silent when the product is absent', () => {
+    expect(
+      formatSignals({ ...NO_SIGNALS, serverVerified: true, stale: false, torExitNode: true }),
+    ).toContain('Tor exit node')
+    // Absent is unknown, not "no" — the prompt must not read silence as a pass.
+    expect(
+      formatSignals({ ...NO_SIGNALS, serverVerified: true, stale: false }),
+    ).not.toContain('Tor')
   })
 
   it('omits a scored signal entirely when the product returned nothing', () => {
