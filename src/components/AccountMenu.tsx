@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { useEffect, useRef, useState } from "react"
-import { SignOutIcon, UserIcon } from "@/components/icons"
+import { ProductsIcon, SessionsIcon, SignOutIcon, UserIcon } from "@/components/icons"
 import { FP_CACHE_KEY } from "@/lib/settings"
 
 // One size and color for every menu glyph; the shapes come from the shared
@@ -32,8 +32,8 @@ export function AccountMenu({
   // Hover-to-open, for mice and trackpads only (touch and keyboard use the
   // click). A short delay before opening keeps a pass across the header from
   // flashing the menu; a grace period before closing lets the pointer cross
-  // the gap into the panel. Clicking a hover-opened menu pins it open until
-  // an outside click or Escape.
+  // the gap into the panel. With a mouse, clicking the button only ever opens
+  // or pins the menu; it never collapses it out from under the pointer.
   const hoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const openedByHover = useRef(false)
   const canHover = () =>
@@ -63,8 +63,9 @@ export function AccountMenu({
   }
   function onTriggerClick() {
     clearHoverTimer()
-    if (open && openedByHover.current) {
-      openedByHover.current = false // pin it
+    if (canHover()) {
+      openedByHover.current = false // pin it: leaving no longer closes
+      setOpen(true)
       return
     }
     openedByHover.current = false
@@ -182,7 +183,29 @@ export function AccountMenu({
             )}
           </div>
 
+          {/* Every page, by the same names as the header: on phones the header
+              links are icon-only, so this is where the pages are spelled out. */}
           <div className="py-1">
+            <Link
+              href="/products"
+              role="menuitem"
+              tabIndex={-1}
+              onClick={() => setOpen(false)}
+              className="flex items-center gap-2 px-3 py-2 text-sm text-gray-900 hover:bg-gray-50"
+            >
+              <ProductsIcon className={MENU_ICON} />
+              Products
+            </Link>
+            <Link
+              href="/sessions"
+              role="menuitem"
+              tabIndex={-1}
+              onClick={() => setOpen(false)}
+              className="flex items-center gap-2 px-3 py-2 text-sm text-gray-900 hover:bg-gray-50"
+            >
+              <SessionsIcon className={MENU_ICON} />
+              Sessions
+            </Link>
             <Link
               href="/account"
               role="menuitem"
@@ -191,7 +214,7 @@ export function AccountMenu({
               className="flex items-center gap-2 px-3 py-2 text-sm text-gray-900 hover:bg-gray-50"
             >
               <UserIcon className={MENU_ICON} />
-              Account settings
+              Account
             </Link>
           </div>
 

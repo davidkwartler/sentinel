@@ -36,9 +36,7 @@ export function SiteHeader({
                 aligns the mark to the line box including descender space, and
                 "Sentinel" has no descenders — so the mark reads low. */}
             <SentinelMark className="h-8 w-8" />
-            {/* Signed in, the wordmark gives way on phones so both section links and the
-                account button fit; it stays as the link's accessible name. */}
-            <span className={session?.user?.id ? "sr-only sm:not-sr-only" : undefined}>Sentinel</span>
+            <span>Sentinel</span>
           </Link>
           <NavLinks signedIn={Boolean(session?.user?.id)} flaggedCount={flaggedCount} />
         </div>
