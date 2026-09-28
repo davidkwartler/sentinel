@@ -253,6 +253,55 @@ function getClient(apiKey: string): FingerprintJsServerApiClient {
   return client
 }
 
+export interface KeepAliveResult {
+  ok: boolean
+  /** Which call the workspace actually saw succeed, for the cron log. */
+  call: "searchEvents" | "getEvent" | null
+  detail: string
+}
+
+/**
+ * Keep a Free-plan Fingerprint workspace from being deactivated for inactivity.
+ *
+ * Fingerprint deactivates Free workspaces after 90 days with no API calls, and
+ * this demo can go that long without anyone signing in. Fingerprint doesn't
+ * document exactly which calls count, so this makes the strongest one available
+ * server-side: a *successful*, authenticated search (limit 1), rather than
+ * checkServerApiHealth's lookup of a request ID that cannot exist — a 404 is
+ * the kind of call most likely not to register as activity. Falls back to that
+ * probe only if the plan doesn't include search.
+ */
+export async function keepFingerprintWorkspaceAlive(): Promise<KeepAliveResult> {
+  const apiKey = process.env.FINGERPRINT_SERVER_API_KEY
+  if (!apiKey) {
+    return { ok: false, call: null, detail: "FINGERPRINT_SERVER_API_KEY is not set." }
+  }
+
+  try {
+    await getClient(apiKey).searchEvents({ limit: 1 })
+    return { ok: true, call: "searchEvents", detail: "Search succeeded." }
+  } catch (err) {
+    const planLacksSearch = err instanceof RequestError && err.errorCode === "FeatureNotEnabled"
+    if (!planLacksSearch) {
+      return {
+        ok: false,
+        call: null,
+        detail:
+          err instanceof RequestError
+            ? `${err.statusCode} ${err.errorCode}: ${describeErrorCode(err.errorCode)}`
+            : `Could not reach the Server API: ${err instanceof Error ? err.message : String(err)}`,
+      }
+    }
+  }
+
+  const health = await checkServerApiHealth()
+  return {
+    ok: health.status === "ok",
+    call: health.status === "ok" ? "getEvent" : null,
+    detail: `Search not on this plan; fell back to the health probe. ${health.detail}`,
+  }
+}
+
 interface ClientClaims {
   visitorId: string
   os?: string | null

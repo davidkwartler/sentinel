@@ -26,7 +26,8 @@ src/
 │   │   └── account/           # Account + detection settings
 │   └── api/
 │       ├── session/record/    # POST: fingerprint ingest + detection + Claude
-│       └── fingerprint/health/ # GET: Fingerprint Server API config check
+│       ├── fingerprint/health/ # GET: Fingerprint Server API config check
+│       └── cron/fingerprint-keepalive/ # Daily Vercel Cron (vercel.json), CRON_SECRET-gated
 ├── components/                # Client components (CartDrawer, SessionTable, etc.)
 ├── lib/
 │   ├── auth.ts                # Auth.js config (Google OAuth, database sessions)
@@ -59,6 +60,7 @@ See `.env.local.example` for full documentation. Key ones:
 - `AUTH_SECRET`, `AUTH_GOOGLE_ID`, `AUTH_GOOGLE_SECRET` — Auth.js + Google OAuth
 - `NEXT_PUBLIC_FINGERPRINT_API_KEY` — FingerprintJS Pro (optional, OSS is default)
 - `ANTHROPIC_API_KEY` — Claude API key
+- `CRON_SECRET` — Bearer token Vercel Cron sends to `/api/cron/*`; those routes refuse everything without it
 - `NEXT_PUBLIC_MODEL_PICKER_ENABLED` — Set `"true"` to enable model selector on profile page
 
 ## Testing
