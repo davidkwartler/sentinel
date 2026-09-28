@@ -34,7 +34,8 @@ export function NavLinks({
         className={`${BASE} ${inProducts ? CURRENT : IDLE}`}
       >
         <ProductsIcon className="h-4 w-4 text-gray-400" />
-        Products
+        {/* Icon-only on phones; the name stays for screen readers. */}
+        <span className="sr-only sm:not-sr-only">Products</span>
       </Link>
       {/* Signed-in only, like the page it leads to. */}
       {signedIn && (
@@ -50,8 +51,8 @@ export function NavLinks({
           className={`${BASE} ${inSessions ? CURRENT : IDLE}`}
         >
           <SessionsIcon className="h-4 w-4 text-gray-400" />
-          Sessions
-          {flagged && <WarningIcon className="h-4 w-4" />}
+          <span className="sr-only sm:not-sr-only">Sessions</span>
+          {flagged && <WarningIcon className="h-3.5 w-3.5" />}
         </Link>
       )}
     </div>
