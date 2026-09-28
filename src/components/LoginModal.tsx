@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useRef } from "react"
-import { ShieldIcon } from "@/components/icons"
+import { SentinelMark } from "@/components/SentinelMark"
 import { GoogleSignInButton, HowItWorks } from "@/components/SignInPanel"
 import { useIsClient, useStorageValue, writeStorage } from "@/lib/use-browser-storage"
 
@@ -46,7 +46,7 @@ export function LoginModal({ signInAction }: { signInAction: () => void }) {
           ✕
         </button>
         <h1 className="mb-2 flex items-center justify-center gap-2.5 text-center text-2xl font-extrabold leading-none tracking-tight text-gray-900">
-          <ShieldIcon className="h-8 w-8" outlined />
+          <SentinelMark className="h-8 w-8" />
           Sentinel
         </h1>
         <p className="mb-8 text-center text-sm text-gray-500">
