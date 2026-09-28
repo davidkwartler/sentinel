@@ -1,8 +1,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
 // Both must be hoisted: vi.mock's factory runs before top-level declarations.
-const { mockGetEvent, MockRequestError } = vi.hoisted(() => ({
+const { mockGetEvent, mockSearchEvents, MockRequestError } = vi.hoisted(() => ({
   mockGetEvent: vi.fn(),
+  mockSearchEvents: vi.fn(),
   MockRequestError: class extends Error {
     statusCode: number
     errorCode: string
@@ -17,6 +18,7 @@ const { mockGetEvent, MockRequestError } = vi.hoisted(() => ({
 vi.mock('@fingerprintjs/fingerprintjs-pro-server-api', () => ({
   FingerprintJsServerApiClient: class {
     getEvent = mockGetEvent
+    searchEvents = mockSearchEvents
   },
   Region: { Global: 'Global', EU: 'EU', AP: 'AP' },
   RequestError: MockRequestError,
@@ -33,6 +35,7 @@ import {
   checkServerApiHealth,
   getCachedServerApiHealth,
   describeErrorCode,
+  keepFingerprintWorkspaceAlive,
 } from '../fingerprint-server'
 import { clampThreshold, MIN_FLAG_THRESHOLD } from '../settings'
 
@@ -402,6 +405,55 @@ describe('checkServerApiHealth', () => {
     const health = await checkServerApiHealth()
 
     expect(JSON.stringify(health)).not.toContain('super-secret-value')
+  })
+})
+
+describe('keepFingerprintWorkspaceAlive', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    process.env.FINGERPRINT_SERVER_API_KEY = 'secret'
+  })
+
+  afterEach(() => {
+    delete process.env.FINGERPRINT_SERVER_API_KEY
+  })
+
+  it('makes a successful search, not the nonexistent-id probe', async () => {
+    mockSearchEvents.mockResolvedValue({ events: [] })
+
+    const result = await keepFingerprintWorkspaceAlive()
+
+    expect(result).toMatchObject({ ok: true, call: 'searchEvents' })
+    expect(mockSearchEvents).toHaveBeenCalledWith({ limit: 1 })
+    expect(mockGetEvent).not.toHaveBeenCalled()
+  })
+
+  it('falls back to the health probe when the plan lacks search', async () => {
+    mockSearchEvents.mockRejectedValue(new MockRequestError(403, 'FeatureNotEnabled'))
+    mockGetEvent.mockRejectedValue(new MockRequestError(404, 'RequestNotFound'))
+
+    const result = await keepFingerprintWorkspaceAlive()
+
+    expect(result).toMatchObject({ ok: true, call: 'getEvent' })
+  })
+
+  it('reports failure for a bad key without falling back', async () => {
+    mockSearchEvents.mockRejectedValue(new MockRequestError(403, 'TokenNotFound'))
+
+    const result = await keepFingerprintWorkspaceAlive()
+
+    expect(result.ok).toBe(false)
+    expect(result.detail).toContain('TokenNotFound')
+    expect(mockGetEvent).not.toHaveBeenCalled()
+  })
+
+  it('reports failure without a key and makes no call', async () => {
+    delete process.env.FINGERPRINT_SERVER_API_KEY
+
+    const result = await keepFingerprintWorkspaceAlive()
+
+    expect(result.ok).toBe(false)
+    expect(mockSearchEvents).not.toHaveBeenCalled()
   })
 })
 
