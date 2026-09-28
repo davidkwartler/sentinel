@@ -15,7 +15,7 @@ export default async function LoginPage() {
           without a gutter it ran edge to edge on an iPhone. */}
       <main className="flex flex-1 items-center justify-center px-4 py-12">
       <div className="w-full max-w-sm rounded-xl border border-gray-200 bg-white p-8 shadow-sm">
-        <h1 className="mb-2 flex items-center justify-center gap-2.5 text-center text-2xl font-semibold leading-none text-gray-900">
+        <h1 className="mb-2 flex items-center justify-center gap-2.5 text-center text-2xl font-extrabold leading-none tracking-tight text-gray-900">
           <ShieldIcon className="h-8 w-8" outlined />
           Sentinel
         </h1>

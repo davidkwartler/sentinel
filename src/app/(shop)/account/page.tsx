@@ -45,7 +45,7 @@ export default async function AccountPage() {
 
   return (
     <div>
-      <h1 className="mb-1 text-2xl font-semibold text-gray-900">Account</h1>
+      <h1 className="mb-1 text-2xl font-extrabold tracking-tight text-gray-900">Account</h1>
       <p className="mb-6 text-sm text-gray-500">
         View account info and adjust session hijack detection settings.
       </p>

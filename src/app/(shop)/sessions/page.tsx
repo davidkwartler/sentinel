@@ -122,7 +122,12 @@ export default async function DashboardPage() {
           on this page changes until the next fingerprint arrives. */}
       <PollingRefresher intervalMs={pending > 0 ? 8000 : 30000} />
       <div className="mb-6">
-        <h1 className="mb-1 text-2xl font-semibold text-gray-900">Sessions</h1>
+        {/* True while this page is open: it refreshes itself on a poll. */}
+        <p className="mb-2 inline-flex items-center gap-1.5 rounded-full bg-violet-100 px-2.5 py-0.5 text-xs font-semibold text-violet-700">
+          <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+          Live monitoring
+        </p>
+        <h1 className="mb-1 text-2xl font-extrabold tracking-tight text-gray-900">Sessions</h1>
         <p className="text-sm text-gray-500">
           View sessions, fingerprints, and detection engine outcomes.
         </p>

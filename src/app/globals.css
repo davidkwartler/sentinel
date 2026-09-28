@@ -1,28 +1,48 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+/* Aurora Flat. Rounded 16px cards, pill buttons, Plus Jakarta Sans, and a
+   lavender-tinted neutral scale, with no gradients, glow, or blur anywhere.
+   Violet is the only accent and appears as flat fills and borders. Light mode
+   only, by design.
 
+   The gray scale is redefined rather than replaced with new names, so every
+   existing gray-* utility picks up the tint without a component rewrite. Each
+   step keeps the contrast of the Tailwind step it replaces: text-gray-500 is
+   still >= 4.5:1 on white, and gray-900 is the ink. */
+/* inline: the font variables are set by next/font on <body>, so the utilities
+   must reference them directly rather than through a :root variable, which
+   would resolve before they exist. */
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--font-jakarta), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+@theme {
+  --color-gray-50: #f6f4fa; /* page */
+  --color-gray-100: #efecf5;
+  --color-gray-200: #e6e2ef; /* lines */
+  --color-gray-300: #d5cfe2;
+  --color-gray-400: #a59db8;
+  --color-gray-500: #6b6283; /* muted text */
+  --color-gray-600: #564d6e;
+  --color-gray-700: #413a58;
+  --color-gray-800: #2d2544;
+  --color-gray-900: #1e1537; /* ink */
+  --color-gray-950: #140e26;
+
+  --radius-md: 0.625rem;
+  --radius-lg: 1rem;
+  --radius-xl: 1.25rem;
+
+  /* One flat, neutral shadow — enough to lift a white card off the page, never
+     a colored glow. */
+  --shadow-sm: 0 1px 2px rgb(30 21 55 / 0.06);
+  --shadow-md: 0 2px 6px -1px rgb(30 21 55 / 0.08);
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--color-gray-50);
+  color: var(--color-gray-900);
 }
 
 /* Every focusable element, not just the ones with utility classes on them.
