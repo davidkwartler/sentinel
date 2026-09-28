@@ -82,6 +82,23 @@ export function SignOutIcon({ className }: { className?: string }) {
   )
 }
 
+// The flagged-session marker on the Sessions nav pill. Filled rather than a
+// stroke glyph so it reads as a status, not a destination; amber rather than
+// red so it doesn't compete with the red FLAGGED badges on the page itself.
+// Drawn instead of the warning emoji, which renders differently on every OS.
+export function WarningIcon({ className = "h-4 w-4" }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 20 20" aria-hidden="true" className={`shrink-0 ${className}`}>
+      <path
+        d="M8.7 3.2a1.5 1.5 0 0 1 2.6 0l6.3 11.1a1.5 1.5 0 0 1-1.3 2.2H3.7a1.5 1.5 0 0 1-1.3-2.2z"
+        fill="#FBBF24"
+      />
+      <path d="M10 7.4v3.9" stroke="#1E1537" strokeWidth={1.8} strokeLinecap="round" />
+      <circle cx="10" cy="13.9" r="1" fill="#1E1537" />
+    </svg>
+  )
+}
+
 // Mirror of SignOutIcon — arrow points into the door rather than out of it.
 export function SignInIcon({ className }: { className?: string }) {
   return (

@@ -3,6 +3,7 @@ import { cookies } from "next/headers"
 import { auth, signOut } from "@/lib/auth"
 import { FingerprintReporter } from "@/components/FingerprintReporter"
 import { SiteHeader } from "@/components/SiteHeader"
+import { countFlaggedSessions } from "@/lib/flagged"
 
 export default async function ShopLayout({
   children,
@@ -10,6 +11,10 @@ export default async function ShopLayout({
   children: React.ReactNode
 }) {
   const session = await auth()
+  const userId = session?.user?.id
+  // One small query per page: the /sessions page's poll re-renders this
+  // layout too (router.refresh), so the header warning stays current there.
+  const flaggedCount = userId ? await countFlaggedSessions(userId) : 0
 
   // A short opaque hash of the session cookie, not the cookie itself and not
   // Session.id — this layout renders on every page, so deriving it here
@@ -28,6 +33,7 @@ export default async function ShopLayout({
     <div className="flex flex-1 flex-col bg-gray-50">
       <a href="#main-content" className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-2 focus:z-50 focus:rounded-md focus:bg-white focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:text-gray-900 focus:shadow-md">Skip to main content</a>
       <SiteHeader
+        flaggedCount={flaggedCount}
         session={session}
         signOutAction={async () => {
           "use server"
