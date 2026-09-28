@@ -73,6 +73,7 @@ Test files live next to source in `__tests__/` directories.
 
 - Tailwind CSS v4 (no tailwind.config — uses CSS-based config)
 - Design direction is **Aurora Flat** (`src/app/globals.css`): Plus Jakarta Sans, a lavender-tinted gray scale (redefined in `@theme`, so plain `gray-*` utilities carry it), 16px card radius, pill-shaped buttons, one neutral shadow. No gradients, glow, blur, or dark mode. Violet is the only accent; red/amber/emerald are status colors only.
+- The site header is an ink band (`bg-gray-900`, `data-surface="ink"`), the one dark surface in the UI. On it: white wordmark, outlined `white/25` pills, a white "Sign in" pill as the single primary action, and a light-violet focus outline (globals.css). The account dropdown stays a white panel.
 - Logo has two tiers: the plain flat violet shield (`src/app/icon.svg`) for the favicon and anything under ~24px, and `SentinelMark` (`src/components/SentinelMark.tsx`, violet gradient + white iris scan) at 32px and up. The logo is the one allowed gradient.
 - Minimal components, no component library
 - Server components by default, `"use client"` only when needed

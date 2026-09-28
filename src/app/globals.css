@@ -59,3 +59,11 @@ textarea:focus-visible,
   outline: 2px solid #7c3aed;
   outline-offset: 2px;
 }
+
+/* The header is an ink band. Brand violet at 2.7:1 against ink is below the
+   3:1 a focus indicator needs, so focus there uses a light violet instead.
+   The account dropdown sits inside the header but is a white panel, so it
+   keeps the default violet. */
+[data-surface="ink"] :focus-visible:not([role="menu"] *) {
+  outline-color: #c4b5fd;
+}

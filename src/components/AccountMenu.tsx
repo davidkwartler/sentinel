@@ -96,15 +96,15 @@ export function AccountMenu({
         aria-haspopup="menu"
         aria-expanded={open}
         aria-label="Account menu"
-        className="flex items-center gap-2 rounded-full border border-gray-300 py-1 pl-1 pr-2.5 transition-colors hover:border-gray-400 hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-600"
+        className="flex items-center gap-2 rounded-full border border-white/25 py-1 pl-1 pr-2.5 transition-colors hover:border-white/40 hover:bg-white/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-300"
       >
         {avatar}
-        <span className="hidden text-sm text-gray-700 sm:inline">Account</span>
+        <span className="hidden text-sm text-gray-100 sm:inline">Account</span>
         <svg
           viewBox="0 0 20 20"
           fill="currentColor"
           aria-hidden="true"
-          className={`h-3.5 w-3.5 text-gray-500 transition-transform ${open ? "rotate-180" : ""}`}
+          className={`h-3.5 w-3.5 text-gray-400 transition-transform ${open ? "rotate-180" : ""}`}
         >
           <path
             fillRule="evenodd"
