@@ -157,7 +157,7 @@ export function SessionTable({
                       {original?.visitorId ?? "—"}
                     </p>
                     {session.isCurrent && (
-                      <span className="shrink-0 rounded bg-gray-900 px-1.5 py-0.5 text-[10px] font-medium text-white">
+                      <span className="shrink-0 rounded-full bg-gray-900 px-2 py-0.5 text-[10px] font-medium text-white">
                         This device
                       </span>
                     )}
@@ -189,7 +189,7 @@ export function SessionTable({
                     setShowFingerprints((p) => (p === session.id ? null : session.id))
                   }
                   aria-expanded={isFingerprintsOpen}
-                  className="rounded-md border border-gray-200 px-2.5 py-1 text-xs text-gray-600 transition-colors hover:bg-gray-50"
+                  className="rounded-full border border-gray-200 bg-white px-3 py-1 text-xs font-medium text-gray-600 transition-colors hover:bg-gray-50"
                 >
                   {isFingerprintsOpen
                     ? "Hide"
@@ -203,7 +203,7 @@ export function SessionTable({
                       setExpandedId((p) => (p === session.id ? null : session.id))
                     }
                     aria-expanded={isAnalysisOpen}
-                    className="rounded-md border border-gray-200 px-2.5 py-1 text-xs text-gray-600 transition-colors hover:bg-gray-50"
+                    className="rounded-full border border-gray-200 bg-white px-3 py-1 text-xs font-medium text-gray-600 transition-colors hover:bg-gray-50"
                   >
                     {isAnalysisOpen ? "Hide" : "View"} analysis
                   </button>
@@ -422,7 +422,7 @@ export function DetectionHistoryList({
                         setExpandedId((p) => (p === event.id ? null : event.id))
                       }
                       aria-expanded={isOpen}
-                      className="rounded-md border border-gray-200 px-2.5 py-1 text-xs text-gray-600 transition-colors hover:bg-gray-50"
+                      className="rounded-full border border-gray-200 bg-white px-3 py-1 text-xs font-medium text-gray-600 transition-colors hover:bg-gray-50"
                     >
                       {isOpen ? "Hide" : "View"} analysis
                     </button>
@@ -459,10 +459,15 @@ function StatCard({
   return (
     <div className="rounded-lg border border-gray-200 bg-white px-4 py-3 shadow-sm">
       <p className="text-xs text-gray-500">{label}</p>
-      <p className={`mt-1 text-2xl font-semibold ${valueColor}`}>{value}</p>
+      <p className={`mt-1 text-2xl font-extrabold tracking-tight tabular-nums ${valueColor}`}>{value}</p>
     </div>
   )
 }
+
+// A ring rather than a bar: the score is the one number on each row that
+// decides the outcome, so it gets the one bold shape. Solid strokes only.
+const RING_RADIUS = 15
+const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS
 
 function ConfidenceMeter({
   score,
@@ -472,20 +477,31 @@ function ConfidenceMeter({
   threshold: number
 }) {
   const flagged = score >= threshold
+  const clamped = Math.min(100, Math.max(0, score))
   return (
     <div
-      className="flex items-center gap-1.5"
+      role="img"
+      aria-label={`Confidence ${score} out of 100, flags at ${threshold}`}
       title={`Confidence ${score}/100 (flags at ${threshold})`}
+      className="relative grid h-10 w-10 shrink-0 place-items-center"
     >
-      <div className="h-1.5 w-16 overflow-hidden rounded-full bg-gray-200">
-        <div
-          className={`h-full rounded-full ${flagged ? "bg-red-500" : "bg-green-500"}`}
-          style={{ width: `${Math.min(100, Math.max(0, score))}%` }}
+      <svg viewBox="0 0 36 36" className="absolute inset-0 -rotate-90" aria-hidden="true">
+        <circle cx="18" cy="18" r={RING_RADIUS} fill="none" strokeWidth="3.5" className="stroke-gray-200" />
+        <circle
+          cx="18"
+          cy="18"
+          r={RING_RADIUS}
+          fill="none"
+          strokeWidth="3.5"
+          strokeLinecap="round"
+          strokeDasharray={RING_CIRCUMFERENCE}
+          strokeDashoffset={RING_CIRCUMFERENCE * (1 - clamped / 100)}
+          className={flagged ? "stroke-red-600" : "stroke-emerald-600"}
         />
-      </div>
+      </svg>
       <span
-        className={`text-xs font-semibold tabular-nums ${
-          flagged ? "text-red-600" : "text-green-700"
+        className={`relative text-xs font-extrabold tabular-nums ${
+          flagged ? "text-red-700" : "text-emerald-700"
         }`}
       >
         {score}
@@ -833,7 +849,7 @@ function StatusBadge({ status }: { status: string }) {
   }
   return (
     <span
-      className={`inline-flex shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${
+      className={`inline-flex shrink-0 rounded-full px-2.5 py-0.5 text-xs font-semibold ${
         styles[status] ?? styles.ACTIVE
       }`}
     >

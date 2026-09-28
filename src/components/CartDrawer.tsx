@@ -130,7 +130,7 @@ export function CartDrawer() {
             </p>
             <button
               onClick={clearCart}
-              className="w-full rounded-md border border-gray-200 px-4 py-2 text-sm text-gray-600 transition-colors hover:bg-gray-50"
+              className="w-full rounded-full border border-gray-200 px-4 py-2 text-sm text-gray-600 transition-colors hover:bg-gray-50"
             >
               Clear Cart
             </button>

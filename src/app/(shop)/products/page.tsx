@@ -16,7 +16,7 @@ export default async function ProductsPage() {
           }}
         />
       )}
-      <h1 className="mb-1 text-2xl font-semibold text-gray-900">Products</h1>
+      <h1 className="mb-1 text-2xl font-extrabold tracking-tight text-gray-900">Products</h1>
       <p className="mb-6 text-sm text-gray-500">
         Browse the sample product catalog while Sentinel records your device
         fingerprint.

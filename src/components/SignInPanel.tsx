@@ -14,7 +14,7 @@ export function GoogleSignInButton({ action }: { action: () => void }) {
     <form action={action}>
       <button
         type="submit"
-        className="flex w-full items-center justify-center gap-3 rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-600 focus-visible:ring-offset-1"
+        className="flex w-full items-center justify-center gap-3 rounded-full border-[1.5px] border-violet-600 bg-white px-4 py-2.5 text-sm font-semibold text-gray-900 hover:bg-violet-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-600 focus-visible:ring-offset-1"
       >
         <Image
           src="/google-g.png"

@@ -14,7 +14,7 @@ export function AddToCartButton({
     return (
       <Link
         href="/login"
-        className="mt-6 inline-block rounded-md bg-gray-900 px-6 py-2 text-sm font-medium text-white transition-colors hover:bg-gray-800"
+        className="mt-6 inline-block rounded-full bg-gray-900 px-6 py-2 text-sm font-medium text-white transition-colors hover:bg-gray-800"
       >
         Sign in to add to cart
       </Link>
@@ -35,7 +35,7 @@ function AuthenticatedCartButton({
   if (inCart) {
     return (
       <div className="mt-6 flex items-center gap-3">
-        <div className="flex items-center rounded-md border border-gray-200">
+        <div className="flex items-center overflow-hidden rounded-full border border-gray-200 bg-white">
           <button
             onClick={() => updateQty(product.id, inCart.qty - 1)}
             className="px-3 py-2 text-sm text-gray-600 hover:bg-gray-50"
@@ -60,7 +60,7 @@ function AuthenticatedCartButton({
   return (
     <button
       onClick={() => addItem(product)}
-      className="mt-6 rounded-md bg-gray-900 px-6 py-2 text-sm font-medium text-white transition-colors hover:bg-gray-800"
+      className="mt-6 rounded-full bg-gray-900 px-6 py-2 text-sm font-medium text-white transition-colors hover:bg-gray-800"
     >
       Add to Cart
     </button>

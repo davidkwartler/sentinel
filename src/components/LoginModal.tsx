@@ -45,7 +45,7 @@ export function LoginModal({ signInAction }: { signInAction: () => void }) {
         >
           ✕
         </button>
-        <h1 className="mb-2 flex items-center justify-center gap-2.5 text-center text-2xl font-semibold leading-none text-gray-900">
+        <h1 className="mb-2 flex items-center justify-center gap-2.5 text-center text-2xl font-extrabold leading-none tracking-tight text-gray-900">
           <ShieldIcon className="h-8 w-8" outlined />
           Sentinel
         </h1>

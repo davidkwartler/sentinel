@@ -72,6 +72,7 @@ Test files live next to source in `__tests__/` directories.
 ## Style
 
 - Tailwind CSS v4 (no tailwind.config — uses CSS-based config)
+- Design direction is **Aurora Flat** (`src/app/globals.css`): Plus Jakarta Sans, a lavender-tinted gray scale (redefined in `@theme`, so plain `gray-*` utilities carry it), 16px card radius, pill-shaped buttons, one neutral shadow. No gradients, glow, blur, or dark mode. Violet is the only accent; red/amber/emerald are status colors only.
 - Minimal components, no component library
 - Server components by default, `"use client"` only when needed
 - Emojis in UI only where explicitly added (product images, nav branding)
