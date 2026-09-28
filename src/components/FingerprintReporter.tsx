@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { useStorageValue, writeStorage } from "@/lib/use-browser-storage"
 import {
   FingerprintJSPro,
   type ExtendedGetResult,
@@ -203,7 +204,12 @@ function writeFpCache(key: string): void {
 export function FingerprintReporter({ sessionKey }: { sessionKey: string | null }) {
   const [status, setStatus] = useState<FpStatus>("idle")
   const [visible, setVisible] = useState(false)
-  const [activeMode, setActiveMode] = useState<"pro" | "oss">("oss")
+  const preferredMode = (useStorageValue(FP_MODE_KEY) ||
+    (process.env.NEXT_PUBLIC_FINGERPRINT_API_KEY ? "pro" : "oss")) as "pro" | "oss"
+  // The path a capture actually took; until one runs (or on a cached load),
+  // the badge reports the preference.
+  const [ranMode, setRanMode] = useState<"pro" | "oss" | null>(null)
+  const activeMode = ranMode ?? preferredMode
   // "Pro selected but unavailable in this browser" is a different situation
   // from "OSS because the user chose it" — the mode badge alone can't tell
   // them apart, since it just reports whichever path actually ran.
@@ -216,17 +222,16 @@ export function FingerprintReporter({ sessionKey }: { sessionKey: string | null 
     // Resolve the mode before the cache check — the cached branch returns early,
     // and skipping this left the badge showing the "oss" initial state on every
     // cached load regardless of the mode actually in use.
+    // Read directly rather than from preferredMode: this effect captures once
+    // per session, and switching mode mid-page shouldn't trigger a re-capture
+    // (ProfileSettings clears the cache so the next page load does that).
     const fpMode = (localStorage.getItem(FP_MODE_KEY) || (process.env.NEXT_PUBLIC_FINGERPRINT_API_KEY ? "pro" : "oss")) as "pro" | "oss"
-    setActiveMode(fpMode)
 
     const cached = readFpCache()
     const ttl = Number(process.env.NEXT_PUBLIC_FINGERPRINT_TTL_MS ?? 1_800_000)
-    if (cached && cached.key === sessionKey && Date.now() - cached.at < ttl) {
-      setStatus("cached")
-      setVisible(true)
-      const timer = setTimeout(() => setVisible(false), 2000)
-      return () => clearTimeout(timer)
-    }
+    const isCached = Boolean(
+      cached && cached.key === sessionKey && Date.now() - cached.at < ttl,
+    )
 
     const modelOverride = localStorage.getItem(MODEL_KEY) || undefined
     // The server ignores this unless NEXT_PUBLIC_THRESHOLD_PICKER_ENABLED is
@@ -243,6 +248,7 @@ export function FingerprintReporter({ sessionKey }: { sessionKey: string | null 
         : undefined
 
     let cancelled = false
+    let hideTimer: ReturnType<typeof setTimeout> | undefined
 
     async function submit(payload: FingerprintPayload): Promise<void> {
       const res = await fetch("/api/session/record", {
@@ -254,12 +260,24 @@ export function FingerprintReporter({ sessionKey }: { sessionKey: string | null 
         if (sessionKey) writeFpCache(sessionKey)
         if (!cancelled) {
           setStatus("done")
-          setTimeout(() => setVisible(false), 3000)
+          hideTimer = setTimeout(() => setVisible(false), 3000)
         }
       }
     }
 
     async function capture() {
+      // Yield once so every state update below lands from an async callback
+      // rather than synchronously inside the effect body.
+      await Promise.resolve()
+      if (cancelled) return
+
+      if (isCached) {
+        setStatus("cached")
+        setVisible(true)
+        hideTimer = setTimeout(() => setVisible(false), 2000)
+        return
+      }
+
       try {
         setStatus("capturing")
         setVisible(true)
@@ -269,7 +287,7 @@ export function FingerprintReporter({ sessionKey }: { sessionKey: string | null 
           const result = await capturePro(modelOverride)
           if (result.ok) {
             payload = result.payload
-            sessionStorage.removeItem(FP_PRO_STATUS_KEY)
+            writeStorage(FP_PRO_STATUS_KEY, null, "session")
             if (!cancelled) setProFailed(false)
           } else {
             console.warn("[Sentinel] Pro fingerprint unavailable, falling back to OSS:", result.reason)
@@ -277,9 +295,9 @@ export function FingerprintReporter({ sessionKey }: { sessionKey: string | null 
             // surface to the user, and no reason for ProfileSettings to show a
             // "Pro unavailable" note over what is really "Pro isn't set up".
             if (result.reason === "no_key") {
-              sessionStorage.removeItem(FP_PRO_STATUS_KEY)
+              writeStorage(FP_PRO_STATUS_KEY, null, "session")
             } else {
-              sessionStorage.setItem(FP_PRO_STATUS_KEY, result.reason)
+              writeStorage(FP_PRO_STATUS_KEY, result.reason, "session")
               if (!cancelled) setProFailed(true)
             }
             payload = await captureOss(modelOverride)
@@ -292,7 +310,7 @@ export function FingerprintReporter({ sessionKey }: { sessionKey: string | null 
         // Reflect the path actually taken, not just the preference — a Pro
         // preference that fell back to OSS must not leave the badge reading
         // "Pro" for a capture that didn't happen.
-        setActiveMode(payload.mode ?? "oss")
+        setRanMode(payload.mode ?? "oss")
 
         await submit({ ...payload, thresholdOverride })
       } catch (err) {
@@ -305,13 +323,12 @@ export function FingerprintReporter({ sessionKey }: { sessionKey: string | null 
 
     return () => {
       cancelled = true
+      clearTimeout(hideTimer)
     }
     // sessionKey changing means the session changed under this tab (sign out
     // + back in within the TTL window) — re-run so the new session gets its
     // own capture instead of reading the previous one's cache entry.
   }, [sessionKey])
-
-  if (!visible) return null
 
   // Pro reads as the emphasized tier (solid brand orange), OSS as the quiet
   // one (outlined). Same family, two weights — not two unrelated hues.
@@ -342,29 +359,36 @@ export function FingerprintReporter({ sessionKey }: { sessionKey: string | null 
   return (
     // bottom-20 clears the footer (≈49px tall) when the page is scrolled to
     // the end — at bottom-4 the toast sat half on top of it.
-    <div className="fixed bottom-20 right-4 z-50 flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-xs shadow-md transition-opacity">
-      {status === "capturing" && (
-        <>
-          <FingerprintIcon className="animate-pulse text-[#F35B22]" />
-          <span className="text-gray-900">Registering fingerprint…</span>
-          {modeBadge}
-          {proUnavailableChip}
-        </>
-      )}
-      {status === "done" && (
-        <>
-          <FingerprintIcon className="text-[#F35B22]" />
-          <span className="text-gray-900">Fingerprint registered</span>
-          {modeBadge}
-          {proUnavailableChip}
-        </>
-      )}
-      {status === "cached" && (
-        <>
-          <FingerprintIcon className="text-[#F35B22]" />
-          <span className="text-gray-900">Fingerprint on file</span>
-          {modeBadge}
-        </>
+    //
+    // The live region stays mounted while the toast comes and goes: a region
+    // inserted together with its text often isn't announced at all.
+    <div role="status" aria-live="polite">
+      {visible && (
+        <div className="fixed bottom-20 right-4 z-50 flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-xs shadow-md transition-opacity">
+          {status === "capturing" && (
+            <>
+              <FingerprintIcon className="animate-pulse text-[#F35B22]" />
+              <span className="text-gray-900">Registering fingerprint…</span>
+              {modeBadge}
+              {proUnavailableChip}
+            </>
+          )}
+          {status === "done" && (
+            <>
+              <FingerprintIcon className="text-[#F35B22]" />
+              <span className="text-gray-900">Fingerprint registered</span>
+              {modeBadge}
+              {proUnavailableChip}
+            </>
+          )}
+          {status === "cached" && (
+            <>
+              <FingerprintIcon className="text-[#F35B22]" />
+              <span className="text-gray-900">Fingerprint on file</span>
+              {modeBadge}
+            </>
+          )}
+        </div>
       )}
     </div>
   )

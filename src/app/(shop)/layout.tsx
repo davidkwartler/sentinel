@@ -40,7 +40,7 @@ export default async function ShopLayout({
       <main id="main-content" className="mx-auto w-full max-w-5xl px-6 py-8">
         {children}
       </main>
-      {session && <FingerprintReporter sessionKey={sessionKey} />}
+      {session?.user?.id && <FingerprintReporter sessionKey={sessionKey} />}
     </div>
   )
 }

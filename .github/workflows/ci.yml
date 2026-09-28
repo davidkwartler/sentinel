@@ -17,4 +17,8 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npx tsc --noEmit
+      - run: npm run lint
       - run: npm run test:run
+      # No secrets needed: every data-bearing route renders on demand, so the
+      # build never opens a database connection or calls an external API.
+      - run: npm run build

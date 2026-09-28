@@ -1,32 +1,45 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useEffect, useRef } from "react"
 import { ShieldIcon } from "@/components/icons"
 import { GoogleSignInButton, HowItWorks } from "@/components/SignInPanel"
+import { useIsClient, useStorageValue, writeStorage } from "@/lib/use-browser-storage"
 
 const DISMISSED_KEY = "sentinel_login_dismissed"
 
 export function LoginModal({ signInAction }: { signInAction: () => void }) {
-  const [show, setShow] = useState(false)
+  const dismissed = useStorageValue(DISMISSED_KEY) !== null
+  const show = useIsClient() && !dismissed
+  const dialogRef = useRef<HTMLDialogElement>(null)
 
+  // showModal() rather than a styled div: the browser supplies the focus
+  // trap, Escape to close, an inert background, and focus return on close.
   useEffect(() => {
-    if (!localStorage.getItem(DISMISSED_KEY)) {
-      setShow(true)
-    }
-  }, [])
+    const dialog = dialogRef.current
+    if (show && dialog && !dialog.open) dialog.showModal()
+  }, [show])
 
   function dismiss() {
-    localStorage.setItem(DISMISSED_KEY, "1")
-    setShow(false)
+    writeStorage(DISMISSED_KEY, "1")
   }
 
   if (!show) return null
 
   return (
-    <div role="dialog" aria-modal="true" aria-label="Sign in to Sentinel" className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto p-4 bg-black/40">
+    <dialog
+      ref={dialogRef}
+      aria-label="Sign in to Sentinel"
+      // Escape fires "cancel" then "close"; either way the prompt is dismissed.
+      onClose={dismiss}
+      // A click whose target is the dialog itself landed on the backdrop.
+      onClick={(e) => {
+        if (e.target === e.currentTarget) e.currentTarget.close()
+      }}
+      className="m-auto w-full max-w-sm bg-transparent p-4 backdrop:bg-black/40"
+    >
       <div className="relative w-full max-w-sm rounded-xl border border-gray-200 bg-white p-8 shadow-lg">
         <button
-          onClick={dismiss}
+          onClick={() => dialogRef.current?.close()}
           className="absolute right-3 top-3 flex h-8 w-8 items-center justify-center rounded-full text-gray-500 hover:bg-gray-100 hover:text-gray-600"
           aria-label="Close"
         >
@@ -42,6 +55,6 @@ export function LoginModal({ signInAction }: { signInAction: () => void }) {
         <GoogleSignInButton action={signInAction} />
         <HowItWorks />
       </div>
-    </div>
+    </dialog>
   )
 }

@@ -39,7 +39,9 @@ function makeRequest(body: unknown): NextRequest {
 describe('POST /api/session/record', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    prismaMock.$transaction.mockImplementation(async (fn: any) => fn(prismaMock))
+    prismaMock.$transaction.mockImplementation(
+      (async (fn: (tx: typeof prismaMock) => unknown) => fn(prismaMock)) as never,
+    )
     // clearAllMocks resets call history but not a mockResolvedValue set by an
     // earlier test — restore the default here so tests that don't care about
     // verification aren't affected by whichever value the previous test left.
@@ -50,7 +52,7 @@ describe('POST /api/session/record', () => {
   })
 
   it('returns 401 when unauthenticated (auth() returns null)', async () => {
-    vi.mocked(auth).mockResolvedValue(null as any)
+    vi.mocked(auth).mockResolvedValue(null as never)
 
     const request = makeRequest({ visitorId: 'fp-1', requestId: 'req-1' })
     const response = await POST(request)
@@ -61,7 +63,7 @@ describe('POST /api/session/record', () => {
   })
 
   it('returns 400 for invalid payload (empty visitorId)', async () => {
-    vi.mocked(auth).mockResolvedValue({ user: { id: 'user-1' }, expires: '' } as any)
+    vi.mocked(auth).mockResolvedValue({ user: { id: 'user-1' }, expires: '' } as never)
     prismaMock.session.findUnique.mockResolvedValue({
       id: 'sess-1',
       sessionToken: 'tok',
@@ -77,8 +79,49 @@ describe('POST /api/session/record', () => {
     expect(body.error).toBe('Invalid payload')
   })
 
+  it('returns 400 for a body that is not valid JSON', async () => {
+    vi.mocked(auth).mockResolvedValue({ user: { id: 'user-1' }, expires: '' } as never)
+    prismaMock.session.findUnique.mockResolvedValue({
+      id: 'sess-1',
+      sessionToken: 'tok',
+      userId: 'user-1',
+      expires: new Date(Date.now() + 3600000),
+    })
+
+    const request = new NextRequest('http://localhost/api/session/record', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Cookie: 'auth_session=tok' },
+      body: '{not json',
+    })
+    const response = await POST(request)
+
+    expect(response.status).toBe(400)
+    expect((await response.json()).error).toBe('Invalid JSON')
+  })
+
+  it('returns 429 once the per-user hourly cap is reached across sessions', async () => {
+    vi.mocked(auth).mockResolvedValue({ user: { id: 'user-1' }, expires: '' } as never)
+    prismaMock.session.findUnique.mockResolvedValue({
+      id: 'sess-1',
+      sessionToken: 'tok',
+      userId: 'user-1',
+      expires: new Date(Date.now() + 3600000),
+    })
+    prismaMock.fingerprint.findUnique.mockResolvedValue(null)
+    // This session is well under its own cap; the user's total is not.
+    // Once-values rather than an implementation: clearAllMocks in beforeEach
+    // doesn't reset implementations, so one would leak into later tests.
+    // Order matches the route's Promise.all: session count, then user count.
+    prismaMock.fingerprint.count.mockResolvedValueOnce(2).mockResolvedValueOnce(90)
+
+    const response = await POST(makeRequest({ visitorId: 'fp-1', requestId: 'req-new' }))
+
+    expect(response.status).toBe(429)
+    expect(prismaMock.fingerprint.create).not.toHaveBeenCalled()
+  })
+
   it('returns 200 with status:duplicate when requestId already exists', async () => {
-    vi.mocked(auth).mockResolvedValue({ user: { id: 'user-1' }, expires: '' } as any)
+    vi.mocked(auth).mockResolvedValue({ user: { id: 'user-1' }, expires: '' } as never)
     prismaMock.session.findUnique.mockResolvedValue({
       id: 'sess-1',
       sessionToken: 'tok',
@@ -112,7 +155,7 @@ describe('POST /api/session/record', () => {
   })
 
   it('returns 404 when no database session exists for user', async () => {
-    vi.mocked(auth).mockResolvedValue({ user: { id: 'user-1' }, expires: '' } as any)
+    vi.mocked(auth).mockResolvedValue({ user: { id: 'user-1' }, expires: '' } as never)
     prismaMock.session.findUnique.mockResolvedValue(null)
 
     const request = makeRequest({ visitorId: 'fp-1', requestId: 'req-1' })
@@ -124,7 +167,7 @@ describe('POST /api/session/record', () => {
   })
 
   it('creates fingerprint and returns ok with detected:false on first visit', async () => {
-    vi.mocked(auth).mockResolvedValue({ user: { id: 'user-1' }, expires: '' } as any)
+    vi.mocked(auth).mockResolvedValue({ user: { id: 'user-1' }, expires: '' } as never)
     prismaMock.session.findUnique.mockResolvedValue({
       id: 'sess-1',
       sessionToken: 'tok',
@@ -185,7 +228,7 @@ describe('POST /api/session/record', () => {
   })
 
   it('marks subsequent fingerprints as non-original', async () => {
-    vi.mocked(auth).mockResolvedValue({ user: { id: 'user-1' }, expires: '' } as any)
+    vi.mocked(auth).mockResolvedValue({ user: { id: 'user-1' }, expires: '' } as never)
     prismaMock.session.findUnique.mockResolvedValue({
       id: 'sess-1',
       sessionToken: 'tok',
@@ -193,7 +236,7 @@ describe('POST /api/session/record', () => {
       expires: new Date(Date.now() + 3600000),
     })
     prismaMock.fingerprint.findUnique.mockResolvedValue(null)
-    prismaMock.fingerprint.findFirst.mockResolvedValue(fingerprintRow({ id: 'fp-existing' }) as any) // has existing
+    prismaMock.fingerprint.findFirst.mockResolvedValue(fingerprintRow({ id: 'fp-existing' }) as never) // has existing
     prismaMock.fingerprint.create.mockResolvedValue(fingerprintRow({
       id: 'fp-second',
       sessionId: 'sess-1',
@@ -224,7 +267,7 @@ describe('POST /api/session/record', () => {
   })
 
   it('resolves server-side verification regardless of a client-supplied "mode", and persists it', async () => {
-    vi.mocked(auth).mockResolvedValue({ user: { id: 'user-1' }, expires: '' } as any)
+    vi.mocked(auth).mockResolvedValue({ user: { id: 'user-1' }, expires: '' } as never)
     prismaMock.session.findUnique.mockResolvedValue({
       id: 'sess-1',
       sessionToken: 'tok',
@@ -286,7 +329,7 @@ describe('POST /api/session/record', () => {
   })
 
   it('normalizes a malformed screenRes to null instead of rejecting the request', async () => {
-    vi.mocked(auth).mockResolvedValue({ user: { id: 'user-1' }, expires: '' } as any)
+    vi.mocked(auth).mockResolvedValue({ user: { id: 'user-1' }, expires: '' } as never)
     prismaMock.session.findUnique.mockResolvedValue({
       id: 'sess-1',
       sessionToken: 'tok',
@@ -339,7 +382,7 @@ describe('POST /api/session/record', () => {
   it.each(['UTC', 'Etc/GMT+5', 'Asia/Calcutta', 'Asia/Kolkata', 'America/Chicago'])(
     'accepts %s as a real timezone',
     async (timezone) => {
-      vi.mocked(auth).mockResolvedValue({ user: { id: 'user-1' }, expires: '' } as any)
+      vi.mocked(auth).mockResolvedValue({ user: { id: 'user-1' }, expires: '' } as never)
       prismaMock.session.findUnique.mockResolvedValue({
         id: 'sess-1',
         sessionToken: 'tok',
@@ -378,7 +421,7 @@ describe('POST /api/session/record', () => {
   )
 
   it('still normalizes a timezone that is not a zone at all', async () => {
-    vi.mocked(auth).mockResolvedValue({ user: { id: 'user-1' }, expires: '' } as any)
+    vi.mocked(auth).mockResolvedValue({ user: { id: 'user-1' }, expires: '' } as never)
     prismaMock.session.findUnique.mockResolvedValue({
       id: 'sess-1',
       sessionToken: 'tok',
@@ -420,7 +463,7 @@ describe('POST /api/session/record', () => {
   })
 
   it('normalizes an unrecognized OS to "Unknown" rather than passing it through', async () => {
-    vi.mocked(auth).mockResolvedValue({ user: { id: 'user-1' }, expires: '' } as any)
+    vi.mocked(auth).mockResolvedValue({ user: { id: 'user-1' }, expires: '' } as never)
     prismaMock.session.findUnique.mockResolvedValue({
       id: 'sess-1',
       sessionToken: 'tok',

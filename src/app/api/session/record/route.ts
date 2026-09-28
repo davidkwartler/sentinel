@@ -73,14 +73,16 @@ const fingerprintSchema = z.object({
 
 // Each mismatched fingerprint triggers a Claude call, so an authenticated
 // script looping on this endpoint is a direct cost lever. Cap ingest per
-// session per hour.
+// session per hour, and per user across sessions — otherwise signing in again
+// mints a fresh allowance each time.
 const MAX_FINGERPRINTS_PER_HOUR = 30
+const MAX_FINGERPRINTS_PER_USER_PER_HOUR = 90
 
 export const maxDuration = 60
 
 export async function POST(request: NextRequest) {
   const session = await auth()
-  if (!session?.user) {
+  if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
 
@@ -97,7 +99,12 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Session not found" }, { status: 404 })
   }
 
-  const body = await request.json()
+  let body: unknown
+  try {
+    body = await request.json()
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 })
+  }
   const parsed = fingerprintSchema.safeParse(body)
   if (!parsed.success) {
     return NextResponse.json({ error: "Invalid payload" }, { status: 400 })
@@ -134,6 +141,9 @@ export async function POST(request: NextRequest) {
   const visitorId = verified?.visitorId ?? data.visitorId
   const signals = verified?.signals ?? null
 
+  // The first x-forwarded-for hop is only trustworthy behind a proxy that
+  // overwrites the header rather than appending to it — Vercel does. Deployed
+  // anywhere else, a client can supply this value itself.
   const ip =
     verified?.ip ??
     request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
@@ -199,13 +209,19 @@ export async function POST(request: NextRequest) {
           })
           if (existing) return { kind: "duplicate", id: existing.id }
 
-          const recentCount = await tx.fingerprint.count({
-            where: {
-              sessionId: dbSession.id,
-              createdAt: { gt: new Date(Date.now() - 60 * 60 * 1000) },
-            },
-          })
-          if (recentCount >= MAX_FINGERPRINTS_PER_HOUR) {
+          const hourAgo = new Date(Date.now() - 60 * 60 * 1000)
+          const [sessionCount, userCount] = await Promise.all([
+            tx.fingerprint.count({
+              where: { sessionId: dbSession.id, createdAt: { gt: hourAgo } },
+            }),
+            tx.fingerprint.count({
+              where: { userId: dbSession.userId, createdAt: { gt: hourAgo } },
+            }),
+          ])
+          if (
+            sessionCount >= MAX_FINGERPRINTS_PER_HOUR ||
+            userCount >= MAX_FINGERPRINTS_PER_USER_PER_HOUR
+          ) {
             return { kind: "rate_limited" }
           }
 
@@ -374,13 +390,19 @@ export async function POST(request: NextRequest) {
         // Fail closed: a broken analysis pipeline must not let a suspicious
         // session pass silently, so flag it rather than leaving it PENDING.
         console.error("[claude] analyzeDetectionEvent failed for event", eventId, err)
-        await prisma.detectionEvent.update({
-          where: { id: eventId },
-          data: {
-            status: "FLAGGED",
-            reasoning: "AI analysis unavailable — flagged automatically due to fingerprint mismatch.",
-          },
-        })
+        // after() swallows a rejection here, so a failed write would leave the
+        // event PENDING with nothing in the logs to say why.
+        await prisma.detectionEvent
+          .update({
+            where: { id: eventId },
+            data: {
+              status: "FLAGGED",
+              reasoning: "AI analysis unavailable — flagged automatically due to fingerprint mismatch.",
+            },
+          })
+          .catch((writeErr) =>
+            console.error("[claude] fail-closed update also failed for event", eventId, writeErr),
+          )
       }
     })
   }

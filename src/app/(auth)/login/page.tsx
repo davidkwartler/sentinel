@@ -6,7 +6,7 @@ import { SiteHeader } from "@/components/SiteHeader"
 
 export default async function LoginPage() {
   const session = await auth()
-  if (session) redirect("/products")
+  if (session?.user?.id) redirect("/products")
   return (
     <div className="flex flex-1 flex-col bg-gray-50">
       {/* showAuth off: the sign-in button would link to this page. */}

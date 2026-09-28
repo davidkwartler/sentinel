@@ -35,6 +35,8 @@ model Account {
   user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([provider, providerAccountId])
+  // Postgres doesn't index foreign keys on its own.
+  @@index([userId])
 }
 
 model Session {
@@ -45,6 +47,9 @@ model Session {
   user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
   fingerprints    Fingerprint[]
   detectionEvents DetectionEvent[]
+
+  // /sessions and /account list a user's sessions on every load and poll.
+  @@index([userId])
 }
 
 model Fingerprint {
@@ -109,8 +114,11 @@ model Fingerprint {
   user         User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
   session      Session? @relation(fields: [sessionId], references: [id], onDelete: SetNull)
 
-  @@index([userId])
-  @@index([sessionId])
+  // Composite with createdAt: the ingest rate limits count a session's and a
+  // user's fingerprints in the last hour, and the leading column still serves
+  // plain lookups by sessionId or userId.
+  @@index([userId, createdAt])
+  @@index([sessionId, createdAt])
   @@index([visitorId])
 }
 
@@ -163,6 +171,7 @@ model DetectionEvent {
   user              User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
   session           Session? @relation(fields: [sessionId], references: [id], onDelete: SetNull)
 
-  @@index([userId])
+  // The detection history lists a user's events newest first.
+  @@index([userId, createdAt])
   @@index([sessionId])
 }
