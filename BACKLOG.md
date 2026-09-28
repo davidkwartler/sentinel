@@ -49,25 +49,6 @@ the reason sign out stays neutral: it is reversible by signing back in, and
 spending the alarm colour on it would dull the signal the dashboard exists to
 raise.
 
-### Polling runs unconditionally, including on a hidden tab
-
-`src/app/(shop)/sessions/PollingRefresher.tsx:10` calls `router.refresh()` on a
-fixed 8-second interval with no conditions. That is a full server round trip
-with a database query attached, every 8 seconds, for as long as the tab exists —
-whether or not anything is happening and whether or not anyone is looking at it.
-
-Two changes, both small:
-
-- Pause while `document.hidden`. A backgrounded tab cannot show a result.
-- Scale the interval to whether work is in flight. The 8-second cadence only
-  earns its cost while a detection event is `PENDING` and Claude is running.
-  With nothing pending, something like 30 seconds is indistinguishable to the
-  user and roughly a quarter of the requests.
-
-`docs/fingerprint-enrichment.md` already rejects a live-refetch details view
-partly on per-view API cost, so this is applying a constraint the project has
-argued for elsewhere.
-
 ### No route-level loading, error, or not-found states
 
 `find src/app -name "loading.tsx" -o -name "error.tsx" -o -name "not-found.tsx"`
@@ -94,8 +75,12 @@ the architecture the project wants to show off. Whatever is used should respect
 
 ## Done
 
-Nothing since this file was reopened. Entries that shipped before it was deleted
-are on branch `backlog/all-items`.
+- Polling runs unconditionally, including on a hidden tab. `PollingRefresher`
+  now stops while `document.hidden`, refreshes immediately on return, and the
+  sessions page polls every 8s only while an event is `PENDING` (30s otherwise).
+
+Entries that shipped before this file was reopened are on branch
+`backlog/all-items`.
 
 ## Not doing
 

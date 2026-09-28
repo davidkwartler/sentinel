@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { useCart } from "./CartProvider"
 import { CartIcon } from "@/components/icons"
 
@@ -8,6 +8,19 @@ export function CartDrawer() {
   const { items, totalItems, totalPrice, updateQty, removeItem, clearCart } =
     useCart()
   const [open, setOpen] = useState(false)
+  const dialogRef = useRef<HTMLDialogElement>(null)
+
+  // A native modal dialog, opened with showModal(): the browser traps focus,
+  // closes on Escape, makes the page behind it inert, and returns focus to
+  // the cart button on close. Closed, it is display:none — the previous
+  // translate-off-screen drawer stayed in the tab order and the
+  // accessibility tree while hidden.
+  useEffect(() => {
+    const dialog = dialogRef.current
+    if (!dialog) return
+    if (open && !dialog.open) dialog.showModal()
+    if (!open && dialog.open) dialog.close()
+  }, [open])
 
   return (
     <>
@@ -28,22 +41,15 @@ export function CartDrawer() {
         </button>
       </div>
 
-      {/* Overlay */}
-      {open && (
-        <div
-          className="fixed inset-0 z-40 bg-black/20"
-          onClick={() => setOpen(false)}
-        />
-      )}
-
-      {/* Drawer */}
-      <div
-        role="dialog"
-        aria-modal="true"
+      <dialog
+        ref={dialogRef}
         aria-label="Shopping cart"
-        className={`fixed right-0 top-0 z-50 flex h-full w-full max-w-sm flex-col border-l border-gray-200 bg-white shadow-xl transition-transform duration-200 ${
-          open ? "translate-x-0" : "translate-x-full"
-        }`}
+        onClose={() => setOpen(false)}
+        // A click whose target is the dialog itself landed on the backdrop.
+        onClick={(e) => {
+          if (e.target === e.currentTarget) setOpen(false)
+        }}
+        className="fixed inset-y-0 left-auto right-0 m-0 h-dvh max-h-none w-full max-w-sm border-l border-gray-200 bg-white p-0 shadow-xl backdrop:bg-black/20 open:flex open:flex-col motion-safe:transition-transform motion-safe:duration-200 motion-safe:starting:open:translate-x-full"
       >
         <div className="flex items-center justify-between border-b border-gray-200 px-5 py-4">
           <h2 className="text-lg font-semibold text-gray-900">
@@ -70,7 +76,7 @@ export function CartDrawer() {
                   key={item.id}
                   className="flex items-center gap-3 rounded-md border border-gray-100 p-3"
                 >
-                  <span className="text-2xl">{item.image}</span>
+                  <span className="text-2xl" aria-hidden="true">{item.image}</span>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-gray-900 truncate">
                       {item.name}
@@ -82,7 +88,7 @@ export function CartDrawer() {
                   <div className="flex items-center gap-1.5">
                     <button
                       onClick={() => updateQty(item.id, item.qty - 1)}
-                      aria-label="Decrease quantity"
+                      aria-label={`Decrease quantity of ${item.name}`}
                       className="flex h-6 w-6 items-center justify-center rounded border border-gray-200 text-xs text-gray-600 hover:bg-gray-50"
                     >
                       −
@@ -92,7 +98,7 @@ export function CartDrawer() {
                     </span>
                     <button
                       onClick={() => updateQty(item.id, item.qty + 1)}
-                      aria-label="Increase quantity"
+                      aria-label={`Increase quantity of ${item.name}`}
                       className="flex h-6 w-6 items-center justify-center rounded border border-gray-200 text-xs text-gray-600 hover:bg-gray-50"
                     >
                       +
@@ -100,7 +106,7 @@ export function CartDrawer() {
                   </div>
                   <button
                     onClick={() => removeItem(item.id)}
-                    aria-label="Remove item"
+                    aria-label={`Remove ${item.name}`}
                     className="text-xs text-gray-500 hover:text-red-500"
                   >
                     ✕
@@ -130,7 +136,7 @@ export function CartDrawer() {
             </button>
           </div>
         )}
-      </div>
+      </dialog>
     </>
   )
 }

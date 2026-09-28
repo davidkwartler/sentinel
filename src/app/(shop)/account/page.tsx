@@ -8,10 +8,12 @@ import { getCachedServerApiHealth } from "@/lib/fingerprint-server"
 
 export default async function AccountPage() {
   const session = await auth()
-  if (!session) redirect("/login")
+  // Check for the user id, not just a session object — Auth.js can return a
+  // populated object carrying an error, which an existence check lets through.
+  const userId = session?.user?.id
+  if (!userId) redirect("/login")
 
   const { user } = session
-  const userId = user!.id!
   const currentToken = (await cookies()).get("auth_session")?.value ?? null
 
   const [activeSessions, currentSession, flaggedCount, health] = await Promise.all([

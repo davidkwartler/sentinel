@@ -27,9 +27,16 @@ export function AccountMenu({
   const [open, setOpen] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
   const triggerRef = useRef<HTMLButtonElement>(null)
+  const menuRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     if (!open) return
+
+    // role="menu" promises the menu keyboard model: focus moves into the menu
+    // on open, arrows move between items, Tab leaves and closes it.
+    const items = () =>
+      Array.from(menuRef.current?.querySelectorAll<HTMLElement>('[role="menuitem"]') ?? [])
+    items()[0]?.focus()
 
     function onPointerDown(event: MouseEvent) {
       if (!containerRef.current?.contains(event.target as Node)) setOpen(false)
@@ -38,6 +45,28 @@ export function AccountMenu({
       if (event.key === "Escape") {
         setOpen(false)
         triggerRef.current?.focus()
+        return
+      }
+      if (event.key === "Tab") {
+        setOpen(false)
+        return
+      }
+      const list = items()
+      if (list.length === 0) return
+      const current = list.indexOf(document.activeElement as HTMLElement)
+      const next =
+        event.key === "ArrowDown"
+          ? (current + 1) % list.length
+          : event.key === "ArrowUp"
+            ? (current - 1 + list.length) % list.length
+            : event.key === "Home"
+              ? 0
+              : event.key === "End"
+                ? list.length - 1
+                : null
+      if (next !== null) {
+        event.preventDefault()
+        list[next].focus()
       }
     }
 
@@ -87,6 +116,7 @@ export function AccountMenu({
 
       {open && (
         <div
+          ref={menuRef}
           role="menu"
           aria-label="Account"
           className="absolute right-0 z-50 mt-2 w-60 overflow-hidden rounded-lg border border-gray-200 bg-white shadow-lg"
@@ -104,6 +134,7 @@ export function AccountMenu({
             <Link
               href="/account"
               role="menuitem"
+              tabIndex={-1}
               onClick={() => setOpen(false)}
               className="flex items-center gap-2 px-3 py-2 text-sm text-gray-900 hover:bg-gray-50"
             >
@@ -113,6 +144,7 @@ export function AccountMenu({
             <Link
               href="/sessions"
               role="menuitem"
+              tabIndex={-1}
               onClick={() => setOpen(false)}
               className="flex items-center gap-2 px-3 py-2 text-sm text-gray-900 hover:bg-gray-50"
             >
@@ -125,6 +157,7 @@ export function AccountMenu({
             <button
               type="submit"
               role="menuitem"
+              tabIndex={-1}
               onClick={() => sessionStorage.removeItem(FP_CACHE_KEY)}
               className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 hover:text-gray-900"
             >

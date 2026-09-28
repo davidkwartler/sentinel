@@ -1,7 +1,5 @@
 "use client"
 
-import { useEffect, useState } from "react"
-
 import { InfoTip } from "@/components/InfoTip"
 import {
   ANALYSIS_OFF,
@@ -18,6 +16,12 @@ import {
   THRESHOLD_KEY,
 } from "@/lib/settings"
 import type { ProFailureReason } from "@/components/FingerprintReporter"
+import {
+  useFlagThreshold,
+  useIsClient,
+  useStorageValue,
+  writeStorage,
+} from "@/lib/use-browser-storage"
 
 const PRO_FAILURE_LABEL: Record<ProFailureReason, string> = {
   no_key: "not configured",
@@ -33,51 +37,31 @@ const THRESHOLD_PICKER_ENABLED =
   process.env.NEXT_PUBLIC_THRESHOLD_PICKER_ENABLED === "true"
 
 export function ProfileSettings() {
-  const [fpMode, setFpMode] = useState<FpMode>("oss")
-  const [model, setModel] = useState<string>(DEFAULT_MODEL)
-  const [threshold, setThreshold] = useState(DEFAULT_FLAG_THRESHOLD)
-  const [proStatus, setProStatus] = useState<ProFailureReason | null>(null)
-  const [mounted, setMounted] = useState(false)
-
-  useEffect(() => {
-    setFpMode(
-      // Same default logic as FingerprintReporter: Pro when an API key is configured
-      (localStorage.getItem(FP_MODE_KEY) as FpMode) ||
-        (process.env.NEXT_PUBLIC_FINGERPRINT_API_KEY ? "pro" : "oss"),
-    )
-    // Set by FingerprintReporter's most recent capture attempt on this tab —
-    // this is where someone would go to act on "Pro selected but unavailable".
-    setProStatus(sessionStorage.getItem(FP_PRO_STATUS_KEY) as ProFailureReason | null)
-    setModel(
-      MODEL_PICKER_ENABLED
-        ? localStorage.getItem(MODEL_KEY) || DEFAULT_MODEL
-        : DEFAULT_MODEL,
-    )
-    // Clamp on read as well as write — a value stored before the floor existed
-    // would otherwise leave the slider out of range.
-    const storedThreshold = Number(localStorage.getItem(THRESHOLD_KEY))
-    if (localStorage.getItem(THRESHOLD_KEY) !== null && Number.isFinite(storedThreshold)) {
-      setThreshold(clampThreshold(storedThreshold))
-    }
-    setMounted(true)
-  }, [])
+  // Same default logic as FingerprintReporter: Pro when an API key is configured.
+  const fpMode = ((useStorageValue(FP_MODE_KEY) as FpMode | null) ||
+    (process.env.NEXT_PUBLIC_FINGERPRINT_API_KEY ? "pro" : "oss")) as FpMode
+  // Set by FingerprintReporter's most recent capture attempt on this tab —
+  // this is where someone would go to act on "Pro selected but unavailable".
+  const proStatus = useStorageValue(FP_PRO_STATUS_KEY, "session") as ProFailureReason | null
+  const storedModel = useStorageValue(MODEL_KEY)
+  const model = MODEL_PICKER_ENABLED ? storedModel || DEFAULT_MODEL : DEFAULT_MODEL
+  const threshold = useFlagThreshold()
+  // Every value above comes from browser storage, so render nothing until the
+  // client can read it rather than flashing the defaults first.
+  const mounted = useIsClient()
 
   function handleFpModeChange(mode: FpMode) {
-    setFpMode(mode)
-    localStorage.setItem(FP_MODE_KEY, mode)
+    writeStorage(FP_MODE_KEY, mode)
     // Clear fingerprint cache so next page load re-fingerprints
-    sessionStorage.removeItem(FP_CACHE_KEY)
+    writeStorage(FP_CACHE_KEY, null, "session")
   }
 
   function handleModelChange(value: string) {
-    setModel(value)
-    localStorage.setItem(MODEL_KEY, value)
+    writeStorage(MODEL_KEY, value)
   }
 
   function handleThresholdChange(value: number) {
-    const clamped = clampThreshold(value)
-    setThreshold(clamped)
-    localStorage.setItem(THRESHOLD_KEY, String(clamped))
+    writeStorage(THRESHOLD_KEY, String(clampThreshold(value)))
   }
 
   if (!mounted) return null
@@ -100,6 +84,7 @@ export function ProfileSettings() {
             { value: "oss", label: "OSS" },
             { value: "pro", label: "Pro" },
           ]}
+          label="Fingerprint source"
           value={fpMode}
           onChange={(v) => handleFpModeChange(v as FpMode)}
         />
@@ -112,6 +97,7 @@ export function ProfileSettings() {
       >
         <SegmentedControl
           options={MODEL_OPTIONS.map((o) => ({ value: o.value, label: o.label }))}
+          label="Analysis model"
           value={model}
           onChange={handleModelChange}
           disabled={!MODEL_PICKER_ENABLED}
@@ -183,17 +169,21 @@ function Row({
 
 function SegmentedControl({
   options,
+  label,
   value,
   onChange,
   disabled,
 }: {
   options: { value: string; label: string }[]
+  label: string
   value: string
   onChange: (value: string) => void
   disabled?: boolean
 }) {
   return (
     <div
+      role="group"
+      aria-label={label}
       className={`inline-flex rounded-md border border-gray-300 bg-gray-100 p-0.5 ${
         disabled ? "opacity-60" : ""
       }`}

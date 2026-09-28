@@ -1,7 +1,7 @@
 "use client"
 
-import { useEffect, useState } from "react"
-import { clampThreshold, DEFAULT_FLAG_THRESHOLD, THRESHOLD_KEY } from "@/lib/settings"
+import { useState, useSyncExternalStore } from "react"
+import { useFlagThreshold } from "@/lib/use-browser-storage"
 
 type DetectionEventRow = {
   id: string
@@ -91,20 +91,9 @@ export function SessionTable({
   )
   const [expandedId, setExpandedId] = useState<string | null>(firstFlagged?.id ?? null)
   const [showFingerprints, setShowFingerprints] = useState<string | null>(null)
-  const [threshold, setThreshold] = useState(DEFAULT_FLAG_THRESHOLD)
-
-  // The flag threshold lives in localStorage (profile settings); read it after
-  // mount so the score colours here match the rule the analysis actually used.
-  // Guarded by the same build flag the server checks — when it's off, the
-  // server always applies DEFAULT_FLAG_THRESHOLD, so reading a stale
-  // localStorage value here would report a flag line the server never applied.
-  useEffect(() => {
-    if (process.env.NEXT_PUBLIC_THRESHOLD_PICKER_ENABLED !== "true") return
-    const stored = Number(localStorage.getItem(THRESHOLD_KEY))
-    if (localStorage.getItem(THRESHOLD_KEY) !== null && Number.isFinite(stored)) {
-      setThreshold(clampThreshold(stored))
-    }
-  }, [])
+  // The flag threshold lives in localStorage (profile settings), so the score
+  // colours here match the rule the analysis actually used.
+  const threshold = useFlagThreshold()
 
   if (sessions.length === 0) {
     return (
@@ -126,6 +115,12 @@ export function SessionTable({
 
   return (
     <div className="space-y-4">
+      {/* The page refreshes itself on a poll, so a session flipping to FLAGGED
+          is otherwise a silent visual change. This line only changes when a
+          count does, which is exactly when it should be announced. */}
+      <p role="status" className="sr-only">
+        {stats.flagged} flagged, {stats.pending} analyzing
+      </p>
       <div className="grid grid-cols-3 gap-3">
         <StatCard label="Active sessions" value={stats.total} />
         <StatCard label="Flagged" value={stats.flagged} tone={stats.flagged > 0 ? "danger" : "neutral"} />
@@ -373,15 +368,7 @@ export function DetectionHistoryList({
   events: DetectionHistoryRow[]
 }) {
   const [expandedId, setExpandedId] = useState<string | null>(null)
-  const [threshold, setThreshold] = useState(DEFAULT_FLAG_THRESHOLD)
-
-  useEffect(() => {
-    if (process.env.NEXT_PUBLIC_THRESHOLD_PICKER_ENABLED !== "true") return
-    const stored = Number(localStorage.getItem(THRESHOLD_KEY))
-    if (localStorage.getItem(THRESHOLD_KEY) !== null && Number.isFinite(stored)) {
-      setThreshold(clampThreshold(stored))
-    }
-  }, [])
+  const threshold = useFlagThreshold()
 
   if (events.length === 0) return null
 
@@ -511,29 +498,62 @@ function ConfidenceMeter({
 // mount. Formatting dates during SSR would mismatch the client's locale and
 // clock, so the relative form is deliberately client-only.
 function RelativeTime({ value }: { value: Date | string }) {
-  const [relative, setRelative] = useState<string | null>(null)
   const iso = typeof value === "string" ? value : value.toISOString()
+  // A clock that ticks every 30s on the client and is null on the server, so
+  // the server render and hydration both use the absolute form.
+  const now = useSyncExternalStore(subscribeToClock, getClockSnapshot, () => null)
 
-  useEffect(() => {
-    function compute() {
-      const seconds = Math.floor((Date.now() - new Date(iso).getTime()) / 1000)
-      if (seconds < 60) return "just now"
-      const minutes = Math.floor(seconds / 60)
-      if (minutes < 60) return `${minutes}m ago`
-      const hours = Math.floor(minutes / 60)
-      if (hours < 24) return `${hours}h ago`
-      return `${Math.floor(hours / 24)}d ago`
-    }
-    setRelative(compute())
-    const timer = setInterval(() => setRelative(compute()), 30_000)
-    return () => clearInterval(timer)
-  }, [iso])
+  let relative: string | null = null
+  if (now !== null) {
+    const seconds = Math.floor((now - new Date(iso).getTime()) / 1000)
+    const minutes = Math.floor(seconds / 60)
+    const hours = Math.floor(minutes / 60)
+    relative =
+      seconds < 60
+        ? "just now"
+        : minutes < 60
+          ? `${minutes}m ago`
+          : hours < 24
+            ? `${hours}h ago`
+            : `${Math.floor(hours / 24)}d ago`
+  }
 
   return (
     <time dateTime={iso} title={new Date(iso).toISOString()}>
       {relative ?? iso.replace("T", " ").slice(0, 16)}
     </time>
   )
+}
+
+const CLOCK_TICK_MS = 30_000
+
+// One shared interval for every RelativeTime on the page, not one per row.
+const clockListeners = new Set<() => void>()
+let clockTimer: ReturnType<typeof setInterval> | null = null
+let clockNow = Date.now()
+
+function subscribeToClock(onTick: () => void): () => void {
+  clockListeners.add(onTick)
+  if (clockTimer === null) {
+    clockNow = Date.now()
+    clockTimer = setInterval(() => {
+      clockNow = Date.now()
+      clockListeners.forEach((listener) => listener())
+    }, CLOCK_TICK_MS)
+  }
+  return () => {
+    clockListeners.delete(onTick)
+    if (clockListeners.size === 0 && clockTimer !== null) {
+      clearInterval(clockTimer)
+      clockTimer = null
+    }
+  }
+}
+
+// Must return the same value between ticks — useSyncExternalStore re-renders
+// whenever the snapshot changes, so reading Date.now() here would loop.
+function getClockSnapshot(): number {
+  return clockNow
 }
 
 // Green only for a genuine server lookup. "Browser-reported" is deliberately

@@ -9,7 +9,7 @@ Session hijack detection app built with Next.js 16, Auth.js v5, FingerprintJS, P
 - `npm run test:run` — Run tests once (Vitest)
 - `npm test` — Run tests in watch mode
 - `npx tsc --noEmit` — Type-check without emitting
-- `npm run lint` — ESLint
+- `npm run lint` — ESLint (CI runs typecheck, lint, tests, and build)
 - `npx prisma db push` — Push schema to database
 - `npx prisma generate` — Regenerate Prisma client (also runs on `npm install` via postinstall)
 
@@ -22,16 +22,21 @@ src/
 │   ├── (shop)/                # Auth-aware route group (guests can browse)
 │   │   ├── layout.tsx         # Nav + FingerprintReporter (auth-only)
 │   │   ├── products/          # Product listing + detail pages
-│   │   ├── dashboard/         # Session Monitoring page
-│   │   └── profile/           # Account + settings
-│   └── api/session/record/    # POST: fingerprint ingest + detection + Claude
+│   │   ├── sessions/          # Session monitoring page (polls while visible)
+│   │   └── account/           # Account + detection settings
+│   └── api/
+│       ├── session/record/    # POST: fingerprint ingest + detection + Claude
+│       └── fingerprint/health/ # GET: Fingerprint Server API config check
 ├── components/                # Client components (CartDrawer, SessionTable, etc.)
 ├── lib/
 │   ├── auth.ts                # Auth.js config (Google OAuth, database sessions)
 │   ├── db.ts                  # Prisma singleton with PrismaPg adapter
 │   ├── detection.ts           # computeSimilarity() + runDetection()
-│   └── claude.ts              # analyzeDetectionEvent() with structured outputs
-├── middleware.ts               # Sets auth_session=anonymous cookie on all routes
+│   ├── claude.ts              # analyzeDetectionEvent() with structured outputs
+│   ├── fingerprint-server.ts  # Server-side verification via Fingerprint's API
+│   ├── settings.ts            # Shared constants (storage keys, models, thresholds)
+│   └── use-browser-storage.ts # useSyncExternalStore hooks over local/sessionStorage
+├── proxy.ts                   # Sets auth_session=anonymous cookie on all routes
 └── test/setup.ts              # Vitest setup file
 ```
 
@@ -41,7 +46,10 @@ src/
 - **Detection pipeline:** Fingerprint POST → `runDetection()` (sync, in transaction) → `after()` → `analyzeDetectionEvent()` (async Claude call). The response returns immediately; Claude runs in the background.
 - **Similarity scoring:** `computeSimilarity()` compares OS, browser, screenRes, timezone. Each field is 0.25 weight. Both-null = match, one-null = inconclusive.
 - **Flagging threshold:** `confidenceScore >= 70` → FLAGGED, otherwise CLEAR.
-- **Guest browsing:** Guests can view products. Cart, fingerprinting, dashboard, and profile require auth.
+- **Guest browsing:** Guests can view products. Cart, fingerprinting, sessions, and account require auth.
+- **Auth checks:** Gate on `session?.user?.id`, never on `session` alone — Auth.js can return a populated object that carries an error.
+- **Browser storage in components:** Read through `useStorageValue` / `useFlagThreshold` and write through `writeStorage` (`src/lib/use-browser-storage.ts`), not by copying storage into state in a mount effect — that trips `react-hooks/set-state-in-effect`.
+- **Modals:** Use a native `<dialog>` opened with `showModal()` (see `CartDrawer`, `LoginModal`) so focus trapping, Escape, and the inert background come from the browser.
 
 ## Environment Variables
 

@@ -52,9 +52,10 @@ describe('analyzeDetectionEvent', () => {
       status: 'PENDING',
       confidenceScore: null,
       reasoning: null,
-    } as any)
+    } as never)
 
     mockCreate.mockResolvedValue({
+      stop_reason: 'end_turn',
       content: [
         {
           type: 'text',
@@ -66,7 +67,7 @@ describe('analyzeDetectionEvent', () => {
       ],
     })
 
-    prismaMock.detectionEvent.update.mockResolvedValue({} as any)
+    prismaMock.detectionEvent.update.mockResolvedValue({} as never)
 
     await analyzeDetectionEvent('event-1')
 
@@ -96,12 +97,13 @@ describe('analyzeDetectionEvent', () => {
     // receive, and that error runs toward under-flagging — a real hijack read as
     // benign private browsing, the wrong direction for a hijack detector.
     prismaMock.detectionEvent.findUnique.mockResolvedValue(
-      detectionEventRow({ id: 'event-1', originalOs: 'Mac OS', newOs: 'Mac OS' }) as any,
+      detectionEventRow({ id: 'event-1', originalOs: 'Mac OS', newOs: 'Mac OS' }) as never,
     )
     mockCreate.mockResolvedValue({
+      stop_reason: 'end_turn',
       content: [{ type: 'text', text: JSON.stringify({ confidenceScore: 10, reasoning: '• benign' }) }],
     })
-    prismaMock.detectionEvent.update.mockResolvedValue({} as any)
+    prismaMock.detectionEvent.update.mockResolvedValue({} as never)
 
     await analyzeDetectionEvent('event-1')
 
@@ -126,12 +128,13 @@ describe('analyzeDetectionEvent', () => {
     // impossible travel out of every Tor session. Precedence has to be stated
     // where the conflict is, not inferred from block ordering.
     prismaMock.detectionEvent.findUnique.mockResolvedValue(
-      detectionEventRow({ id: 'event-1' }) as any,
+      detectionEventRow({ id: 'event-1' }) as never,
     )
     mockCreate.mockResolvedValue({
+      stop_reason: 'end_turn',
       content: [{ type: 'text', text: JSON.stringify({ confidenceScore: 10, reasoning: '• benign' }) }],
     })
-    prismaMock.detectionEvent.update.mockResolvedValue({} as any)
+    prismaMock.detectionEvent.update.mockResolvedValue({} as never)
 
     await analyzeDetectionEvent('event-1')
 
@@ -164,9 +167,10 @@ describe('analyzeDetectionEvent', () => {
       status: 'PENDING',
       confidenceScore: null,
       reasoning: null,
-    } as any)
+    } as never)
 
     mockCreate.mockResolvedValue({
+      stop_reason: 'end_turn',
       content: [
         {
           type: 'text',
@@ -178,7 +182,7 @@ describe('analyzeDetectionEvent', () => {
       ],
     })
 
-    prismaMock.detectionEvent.update.mockResolvedValue({} as any)
+    prismaMock.detectionEvent.update.mockResolvedValue({} as never)
 
     await analyzeDetectionEvent('event-2')
 
@@ -216,12 +220,13 @@ describe('analyzeDetectionEvent', () => {
       status: 'PENDING',
       confidenceScore: null,
       reasoning: null,
-    } as any)
+    } as never)
 
     mockCreate.mockResolvedValue({
+      stop_reason: 'end_turn',
       content: [{ type: 'text', text: JSON.stringify({ confidenceScore: 50, reasoning: 'test' }) }],
     })
-    prismaMock.detectionEvent.update.mockResolvedValue({} as any)
+    prismaMock.detectionEvent.update.mockResolvedValue({} as never)
 
     await analyzeDetectionEvent('event-3', 'claude-opus-5')
 
@@ -254,12 +259,13 @@ describe('analyzeDetectionEvent', () => {
       status: 'PENDING',
       confidenceScore: null,
       reasoning: null,
-    } as any)
+    } as never)
 
     mockCreate.mockResolvedValue({
+      stop_reason: 'end_turn',
       content: [{ type: 'text', text: JSON.stringify({ confidenceScore: 50, reasoning: 'test' }) }],
     })
-    prismaMock.detectionEvent.update.mockResolvedValue({} as any)
+    prismaMock.detectionEvent.update.mockResolvedValue({} as never)
 
     // 50 is below the default 70 threshold, but at a stricter threshold of 40
     // the same score should flag
@@ -298,12 +304,13 @@ describe('analyzeDetectionEvent', () => {
       status: 'PENDING',
       confidenceScore: null,
       reasoning: null,
-    } as any)
+    } as never)
 
     mockCreate.mockResolvedValue({
+      stop_reason: 'end_turn',
       content: [{ type: 'text', text: JSON.stringify({ confidenceScore: 88, reasoning: 'test' }) }],
     })
-    prismaMock.detectionEvent.update.mockResolvedValue({} as any)
+    prismaMock.detectionEvent.update.mockResolvedValue({} as never)
 
     await analyzeDetectionEvent('event-6')
 
@@ -337,14 +344,69 @@ describe('analyzeDetectionEvent', () => {
       status: 'PENDING',
       confidenceScore: null,
       reasoning: null,
-    } as any)
+    } as never)
 
     mockCreate.mockResolvedValue({
+      stop_reason: 'end_turn',
       content: [{ type: 'tool_use', id: 'tool-1', name: 'test', input: {} }],
     })
 
     await expect(analyzeDetectionEvent('event-4')).rejects.toThrow(
-      'Unexpected Claude response type',
+      'no text block',
+    )
+  })
+
+  it('throws on truncated output instead of parsing half an object', async () => {
+    prismaMock.detectionEvent.findUnique.mockResolvedValue(
+      detectionEventRow({ id: 'event-5' }) as never,
+    )
+    mockCreate.mockResolvedValue({
+      stop_reason: 'max_tokens',
+      content: [{ type: 'text', text: '{"confidenceScore": 9' }],
+    })
+
+    await expect(analyzeDetectionEvent('event-5')).rejects.toThrow('max_tokens')
+    expect(prismaMock.detectionEvent.update).not.toHaveBeenCalled()
+  })
+
+  it('reads the text block when a thinking block comes first', async () => {
+    prismaMock.detectionEvent.findUnique.mockResolvedValue(
+      detectionEventRow({ id: 'event-6' }) as never,
+    )
+    mockCreate.mockResolvedValue({
+      stop_reason: 'end_turn',
+      content: [
+        { type: 'thinking', thinking: '', signature: 'sig' },
+        { type: 'text', text: JSON.stringify({ confidenceScore: 80, reasoning: '• hijack' }) },
+      ],
+    })
+    prismaMock.detectionEvent.update.mockResolvedValue({} as never)
+
+    await analyzeDetectionEvent('event-6')
+
+    expect(prismaMock.detectionEvent.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ confidenceScore: 80, status: 'FLAGGED' }),
+      }),
+    )
+  })
+
+  it('clamps an out-of-range score into 0-100', async () => {
+    prismaMock.detectionEvent.findUnique.mockResolvedValue(
+      detectionEventRow({ id: 'event-7' }) as never,
+    )
+    mockCreate.mockResolvedValue({
+      stop_reason: 'end_turn',
+      content: [{ type: 'text', text: JSON.stringify({ confidenceScore: 140, reasoning: '• x' }) }],
+    })
+    prismaMock.detectionEvent.update.mockResolvedValue({} as never)
+
+    await analyzeDetectionEvent('event-7')
+
+    expect(prismaMock.detectionEvent.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ confidenceScore: 100 }),
+      }),
     )
   })
 })

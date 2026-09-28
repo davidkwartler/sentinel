@@ -232,7 +232,10 @@ export async function analyzeDetectionEvent(
 
   const response = await anthropic.messages.create({
     model,
-    max_tokens: 512,
+    // The reasoning itself is capped at ~400 characters, but Sonnet 5 and
+    // Opus 5 think by default and that thinking counts against this budget —
+    // at 512 a thoughtful response could truncate mid-JSON and fail closed.
+    max_tokens: 4096,
     system: SYSTEM_PROMPT,
     messages: [
       {
@@ -274,21 +277,34 @@ export async function analyzeDetectionEvent(
     },
   })
 
-  if (response.content[0].type !== "text") {
-    throw new Error(`Unexpected Claude response type: ${response.content[0].type}`)
+  // Truncated or refused output isn't a verdict. Throwing routes it to the
+  // caller's fail-closed path instead of a JSON.parse error on half an object.
+  if (response.stop_reason !== "end_turn") {
+    throw new Error(`Claude analysis stopped early: ${response.stop_reason}`)
   }
 
-  const result = JSON.parse(response.content[0].text) as {
+  // Thinking models lead with thinking blocks, so find the text block rather
+  // than assuming it is first.
+  const text = response.content.find((block) => block.type === "text")
+  if (!text) {
+    throw new Error("Claude response contained no text block")
+  }
+
+  const result = JSON.parse(text.text) as {
     confidenceScore: number
     reasoning: string
   }
 
+  // The schema can require an integer but not bound it. Clamp so an
+  // out-of-range score can't reach the stored record or the threshold compare.
+  const confidenceScore = Math.min(100, Math.max(0, Math.round(result.confidenceScore)))
+
   await prisma.detectionEvent.update({
     where: { id: eventId },
     data: {
-      confidenceScore: result.confidenceScore,
+      confidenceScore,
       reasoning: result.reasoning,
-      status: result.confidenceScore >= flagThreshold ? "FLAGGED" : "CLEAR",
+      status: confidenceScore >= flagThreshold ? "FLAGGED" : "CLEAR",
     },
   })
 }

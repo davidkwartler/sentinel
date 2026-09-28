@@ -11,14 +11,17 @@ const DETECTION_HISTORY_LIMIT = 50
 
 export default async function DashboardPage() {
   const session = await auth()
-  if (!session) redirect("/login")
+  // Check for the user id, not just a session object — Auth.js can return a
+  // populated object carrying an error, which an existence check lets through.
+  const userId = session?.user?.id
+  if (!userId) redirect("/login")
 
   // Used only to mark which row is the browser being viewed from. The token
   // itself is never sent to the client — only the derived boolean.
   const currentToken = (await cookies()).get("auth_session")?.value ?? null
 
   const sessions = await prisma.session.findMany({
-    where: { userId: session.user!.id!, expires: { gt: new Date() } },
+    where: { userId: userId, expires: { gt: new Date() } },
     select: {
       id: true,
       sessionToken: true,
@@ -95,7 +98,7 @@ export default async function DashboardPage() {
   const liveSessionIds = rows.map((r) => r.id)
   const detectionHistory = await prisma.detectionEvent.findMany({
     where: {
-      userId: session.user!.id!,
+      userId: userId,
       OR: [{ sessionId: null }, { sessionId: { notIn: liveSessionIds } }],
     },
     orderBy: { createdAt: "desc" },
@@ -115,7 +118,9 @@ export default async function DashboardPage() {
 
   return (
     <div>
-      <PollingRefresher intervalMs={8000} />
+      {/* Fast only while Claude is working on something; otherwise nothing
+          on this page changes until the next fingerprint arrives. */}
+      <PollingRefresher intervalMs={pending > 0 ? 8000 : 30000} />
       <div className="mb-6">
         <h1 className="mb-1 text-2xl font-semibold text-gray-900">Sessions</h1>
         <p className="text-sm text-gray-500">
