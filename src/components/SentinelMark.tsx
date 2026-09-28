@@ -3,13 +3,27 @@
 import { useId } from "react"
 import { BRAND_VIOLET, SHIELD_PATH } from "@/components/icons"
 
-// Four scanner corners around a 9.8 x 8.6-unit box centered on (12, 11).
-const SCAN_BRACKETS =
-  "M7.1 8.6V6.7H9M15 6.7H16.9V8.6M7.1 13.4V15.3H9M15 15.3H16.9V13.4"
+// Everything is centered on (12, 10.7) rather than the box's middle: the
+// shield's pointed bottom puts its visual center about 0.3 units above its
+// geometric one, and a scan at y=11 looks like it's sagging.
+//
+// Sized for the smallest place this mark appears: 32 CSS px in the header,
+// which is 32 physical pixels on a standard (1x) screen. At the first shipped
+// weights (1.05-unit strokes, 1.9-unit arms) the corners rendered as faint
+// ticks there; 1.3 and 2.2 keep them reading as corners.
 
-// A 6.2 x 4.1-unit almond, flatter toward the corners.
+// Four scanner corners around a 9.2 x 8-unit box, 1.3 units wide.
+const SCAN_BRACKETS =
+  "M7.4 8.9V6.7H9.6M14.4 6.7H16.6V8.9M7.4 12.5V14.7H9.6M14.4 14.7H16.6V12.5"
+const SCAN_STROKE = 1.3
+
+// A 6.2 x 4.4-unit almond, flatter toward the corners.
 const SCAN_EYE =
-  "M8.9 11C9.985 9.0525 10.76 8.95 12 8.95C13.24 8.95 14.015 9.0525 15.1 11C14.015 12.9475 13.24 13.05 12 13.05C10.76 13.05 9.985 12.9475 8.9 11Z"
+  "M8.9 10.7C9.985 8.61 10.76 8.5 12 8.5C13.24 8.5 14.015 8.61 15.1 10.7C14.015 12.79 13.24 12.9 12 12.9C10.76 12.9 9.985 12.79 8.9 10.7Z"
+
+// Dark rather than brand violet: at 32px a violet pupil blurred into the
+// shield around the eye, and a darker, larger one reads as an eye.
+const PUPIL_COLOR = "#4C1D95"
 
 /**
  * The large-size Sentinel mark: the brand shield on a violet gradient with a
@@ -46,15 +60,12 @@ export function SentinelMark({ className = "h-8 w-8" }: { className?: string }) 
         d={SCAN_BRACKETS}
         fill="none"
         stroke="white"
-        strokeWidth={1.05}
+        strokeWidth={SCAN_STROKE}
         strokeLinecap="round"
         strokeLinejoin="round"
       />
       <path d={SCAN_EYE} fill="white" />
-      {/* Solid rather than the gradient: at the eye's position the gradient is
-          within a shade of brand violet, and one gradient reference per mark
-          is one fewer thing to break. */}
-      <circle cx="12" cy="11" r="1.05" fill={BRAND_VIOLET} />
+      <circle cx="12" cy="10.7" r="1.25" fill={PUPIL_COLOR} />
     </svg>
   )
 }
