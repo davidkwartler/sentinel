@@ -3,19 +3,22 @@ import type { Session } from "next-auth"
 import { AccountMenu } from "@/components/AccountMenu"
 import { SignInIcon } from "@/components/icons"
 import { SentinelMark } from "@/components/SentinelMark"
-import { CatalogLink } from "@/components/CatalogLink"
+import { NavLinks } from "@/components/NavLinks"
 
-// Shared across the shop layout and the login page so the brand and catalog
-// link stay put while signing in. `showAuth` hides the account controls — on
+// Shared across the shop layout and the login page so the brand and section
+// links stay put while signing in. `showAuth` hides the account controls — on
 // /login the sign-in button would point at the page you are already on.
 export function SiteHeader({
   session,
   showAuth = true,
   signOutAction,
+  flaggedCount = 0,
 }: {
   session: Session | null
   showAuth?: boolean
   signOutAction?: () => Promise<void>
+  /** Live sessions currently flagged; drives the warning on the Sessions link. */
+  flaggedCount?: number
 }) {
   return (
     // An ink band: the one dark surface in the otherwise light-only Aurora Flat
@@ -33,12 +36,11 @@ export function SiteHeader({
                 aligns the mark to the line box including descender space, and
                 "Sentinel" has no descenders — so the mark reads low. */}
             <SentinelMark className="h-8 w-8" />
-            <span>Sentinel</span>
+            {/* Signed in, the wordmark gives way on phones so both section links and the
+                account button fit; it stays as the link's accessible name. */}
+            <span className={session?.user?.id ? "sr-only sm:not-sr-only" : undefined}>Sentinel</span>
           </Link>
-          {/* Styled as a button rather than a bare link so it reads as an
-              action next to the wordmark instead of part of it. Client
-              component: it needs the pathname to mark itself current. */}
-          <CatalogLink />
+          <NavLinks signedIn={Boolean(session?.user?.id)} flaggedCount={flaggedCount} />
         </div>
 
         {showAuth && (

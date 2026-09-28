@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { useEffect, useRef, useState } from "react"
-import { SessionsIcon, SignOutIcon, UserIcon } from "@/components/icons"
+import { SignOutIcon, UserIcon } from "@/components/icons"
 import { FP_CACHE_KEY } from "@/lib/settings"
 
 // One size and color for every menu glyph; the shapes come from the shared
@@ -29,14 +29,61 @@ export function AccountMenu({
   const triggerRef = useRef<HTMLButtonElement>(null)
   const menuRef = useRef<HTMLDivElement>(null)
 
+  // Hover-to-open, for mice and trackpads only (touch and keyboard use the
+  // click). A short delay before opening keeps a pass across the header from
+  // flashing the menu; a grace period before closing lets the pointer cross
+  // the gap into the panel. Clicking a hover-opened menu pins it open until
+  // an outside click or Escape.
+  const hoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const openedByHover = useRef(false)
+  const canHover = () =>
+    typeof window !== "undefined" &&
+    window.matchMedia("(hover: hover) and (pointer: fine)").matches
+
+  function clearHoverTimer() {
+    if (hoverTimer.current) clearTimeout(hoverTimer.current)
+    hoverTimer.current = null
+  }
+  function onPointerEnter() {
+    if (!canHover()) return
+    clearHoverTimer()
+    hoverTimer.current = setTimeout(() => {
+      setOpen((wasOpen) => {
+        if (!wasOpen) openedByHover.current = true
+        return true
+      })
+    }, 80)
+  }
+  function onPointerLeave() {
+    if (!canHover()) return
+    clearHoverTimer()
+    hoverTimer.current = setTimeout(() => {
+      if (openedByHover.current) setOpen(false)
+    }, 220)
+  }
+  function onTriggerClick() {
+    clearHoverTimer()
+    if (open && openedByHover.current) {
+      openedByHover.current = false // pin it
+      return
+    }
+    openedByHover.current = false
+    setOpen((v) => !v)
+  }
+  useEffect(() => clearHoverTimer, [])
+
   useEffect(() => {
-    if (!open) return
+    if (!open) {
+      openedByHover.current = false
+      return
+    }
 
     // role="menu" promises the menu keyboard model: focus moves into the menu
     // on open, arrows move between items, Tab leaves and closes it.
     const items = () =>
       Array.from(menuRef.current?.querySelectorAll<HTMLElement>('[role="menuitem"]') ?? [])
-    items()[0]?.focus()
+    // A menu opened by pointing shouldn't pull focus out from under the page.
+    if (!openedByHover.current) items()[0]?.focus()
 
     function onPointerDown(event: MouseEvent) {
       if (!containerRef.current?.contains(event.target as Node)) setOpen(false)
@@ -88,11 +135,16 @@ export function AccountMenu({
   )
 
   return (
-    <div className="relative" ref={containerRef}>
+    <div
+      className="relative"
+      ref={containerRef}
+      onPointerEnter={onPointerEnter}
+      onPointerLeave={onPointerLeave}
+    >
       <button
         ref={triggerRef}
         type="button"
-        onClick={() => setOpen((v) => !v)}
+        onClick={onTriggerClick}
         aria-haspopup="menu"
         aria-expanded={open}
         aria-label="Account menu"
@@ -140,16 +192,6 @@ export function AccountMenu({
             >
               <UserIcon className={MENU_ICON} />
               Account settings
-            </Link>
-            <Link
-              href="/sessions"
-              role="menuitem"
-              tabIndex={-1}
-              onClick={() => setOpen(false)}
-              className="flex items-center gap-2 px-3 py-2 text-sm text-gray-900 hover:bg-gray-50"
-            >
-              <SessionsIcon className={MENU_ICON} />
-              Session monitoring
             </Link>
           </div>
 
