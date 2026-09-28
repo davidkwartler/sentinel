@@ -1,7 +1,8 @@
 import Link from "next/link"
 import type { Session } from "next-auth"
 import { AccountMenu } from "@/components/AccountMenu"
-import { ShieldIcon, SignInIcon } from "@/components/icons"
+import { SignInIcon } from "@/components/icons"
+import { SentinelMark } from "@/components/SentinelMark"
 import { CatalogLink } from "@/components/CatalogLink"
 
 // Shared across the shop layout and the login page so the brand and catalog
@@ -27,7 +28,7 @@ export function SiteHeader({
             {/* leading-none on the lockup: with default leading, items-center
                 aligns the mark to the line box including descender space, and
                 "Sentinel" has no descenders — so the mark reads low. */}
-            <ShieldIcon className="h-8 w-8" outlined />
+            <SentinelMark className="h-8 w-8" />
             <span>Sentinel</span>
           </Link>
           {/* Styled as a button rather than a bare link so it reads as an

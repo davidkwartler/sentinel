@@ -25,43 +25,20 @@ function Stroke({
   )
 }
 
-// The Sentinel mark: Remix Icon's faceted shield (Apache 2.0,
-// Remix-Design/RemixIcon) in brand violet. Violet because red, amber, green,
-// and orange all carry status meaning elsewhere in the app.
+// The Sentinel mark, in two tiers. The silhouette is Remix Icon's faceted
+// shield (Apache 2.0, Remix-Design/RemixIcon) in brand violet — violet because
+// red, amber, green, and orange all carry status meaning elsewhere in the app.
+//
+// - Favicon and anything under ~24px: the plain flat shield (src/app/icon.svg).
+//   An eye is noise at that size, and this is also the shield davidkwartler.com
+//   uses, so it stays put.
+// - 32px and up (header, login card, sign-in modal): SentinelMark
+//   (./SentinelMark.tsx), the shield on a violet gradient with a white iris
+//   scan. The logo is the one place a gradient is allowed; the UI stays flat.
 export const BRAND_VIOLET = "#7C3AED"
-export const BRAND_VIOLET_DARK = "#4C1D95"
 
-const SHIELD_PATH =
+export const SHIELD_PATH =
   "M3.78307 2.82598L12 1L20.2169 2.82598C20.6745 2.92766 21 3.33347 21 3.80217V13.7889C21 15.795 19.9974 17.6684 18.3282 18.7812L12 23L5.6718 18.7812C4.00261 17.6684 3 15.795 3 13.7889V3.80217C3 3.33347 3.32553 2.92766 3.78307 2.82598Z"
-
-/**
- * `outlined` adds the darker keyline used at header sizes. Leave it off below
- * roughly 20px — the stroke eats too much of the shape and the mark reads
- * muddy rather than violet.
- */
-export function ShieldIcon({
-  className = "h-5 w-5",
-  outlined = false,
-}: {
-  className?: string
-  outlined?: boolean
-}) {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      fill={BRAND_VIOLET}
-      aria-hidden="true"
-      className={`shrink-0 ${className}`}
-    >
-      <path
-        d={SHIELD_PATH}
-        stroke={outlined ? BRAND_VIOLET_DARK : undefined}
-        strokeWidth={outlined ? 2 : undefined}
-        strokeLinejoin="round"
-      />
-    </svg>
-  )
-}
 
 // A price tag rather than the old four-square grid: the grid said "layout",
 // not "things you can buy", and four thin squares turned to mush at 14px.

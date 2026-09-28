@@ -1,8 +1,30 @@
-# Sentinel
+<div align="center">
 
-> Session hijack detection powered by FingerprintJS Pro and Claude AI.
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/sentinel-lockup-dark.png">
+  <img alt="Sentinel: session hijack detection demo" src="docs/images/sentinel-lockup-light.png" width="420">
+</picture>
 
-**Live demo:** https://sentinel.davidkwartler.com
+**Session hijack detection powered by FingerprintJS Pro and Claude.**
+
+[![CI](https://github.com/davidkwartler/sentinel/actions/workflows/ci.yml/badge.svg)](https://github.com/davidkwartler/sentinel/actions/workflows/ci.yml)
+[![Live demo](https://img.shields.io/website?url=https%3A%2F%2Fsentinel.davidkwartler.com&label=live%20demo&up_message=online&down_message=offline)](https://sentinel.davidkwartler.com)
+[![License: MIT](https://img.shields.io/badge/license-MIT-7C3AED)](LICENSE)
+
+[![Next.js](https://img.shields.io/badge/Next.js-16-000000?logo=nextdotjs&logoColor=white)](https://nextjs.org)
+[![React](https://img.shields.io/badge/React-19-20232A?logo=react&logoColor=61DAFB)](https://react.dev)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org)
+[![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-4-06B6D4?logo=tailwindcss&logoColor=white)](https://tailwindcss.com)
+[![Prisma](https://img.shields.io/badge/Prisma-7-2D3748?logo=prisma&logoColor=white)](https://www.prisma.io)
+[![Auth.js](https://img.shields.io/badge/Auth.js-v5-7C3AED)](https://authjs.dev)
+[![Neon Postgres](https://img.shields.io/badge/Neon-Postgres-4169E1?logo=postgresql&logoColor=white)](https://neon.tech)
+[![Claude](https://img.shields.io/badge/Claude-Anthropic-D97757?logo=claude&logoColor=white)](https://www.anthropic.com/claude)
+[![FingerprintJS Pro](https://img.shields.io/badge/FingerprintJS-Pro-F35B22)](https://fingerprint.com)
+[![Vercel](https://img.shields.io/badge/deployed_on-Vercel-000000?logo=vercel&logoColor=white)](https://vercel.com)
+
+[**Live demo**](https://sentinel.davidkwartler.com) · [How it works](#architecture) · [Run it locally](#prerequisites)
+
+</div>
 
 Session hijacking is account takeover that skips the login: whoever copies a valid session cookie inherits an already-authenticated session, so passwords and MFA never come into play. Most identity controls run at sign-in, so nothing is watching afterward, and the activity looks like an ordinary logged-in customer until the damage shows up.
 
@@ -21,9 +43,9 @@ Sentinel is a Next.js application that detects it. When a stolen cookie is used 
     <td align="center" valign="top">Toggle fingerprinting, GenAI model, and confidence score</td>
   </tr>
   <tr>
-    <td align="center"><img width="100%" alt="Sign-in modal over the sample product catalog, with a three-step summary of how detection works" src="https://github.com/user-attachments/assets/a0fa2f53-68a0-4c1f-86cb-8636a25993e9" /></td>
-    <td align="center"><img width="100%" alt="Sessions page showing one flagged session scored 96 of 100, with original and later fingerprints side by side" src="https://github.com/user-attachments/assets/fed2f6a5-b5a8-4a9b-8514-9406a4785df7" /></td>
-    <td align="center"><img width="100%" alt="Account page showing fingerprint source, analysis model, and flag threshold controls" src="https://github.com/user-attachments/assets/71d48b9a-af13-49fe-a562-611bcaf694cd" /></td>
+    <td align="center"><img width="100%" alt="Sign-in modal over the sample product catalog, with a three-step summary of how detection works" src="docs/images/screenshot-sign-in.png" /></td>
+    <td align="center"><img width="100%" alt="Sessions page showing a flagged session scored 96 of 100, with the original and later fingerprints side by side and Claude's reasoning" src="docs/images/screenshot-sessions.png" /></td>
+    <td align="center"><img width="100%" alt="Account page showing fingerprint source, analysis model, and flag threshold controls" src="docs/images/screenshot-account.png" /></td>
   </tr>
 </table>
 </div>
