@@ -1,9 +1,6 @@
 <div align="center">
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/images/sentinel-lockup-dark.png">
-  <img alt="Sentinel: session hijack detection demo" src="docs/images/sentinel-lockup-light.png" width="420">
-</picture>
+<img alt="Sentinel: session hijack detection demo" src="docs/images/sentinel-lockup.png" width="480">
 
 **Session hijack detection powered by FingerprintJS Pro and Claude.**
 
