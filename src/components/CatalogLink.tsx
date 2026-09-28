@@ -19,7 +19,7 @@ export function CatalogLink() {
 
   const label = (
     <>
-      <ProductsIcon className="h-4 w-4 text-gray-500" />
+      <ProductsIcon className="h-4 w-4 text-gray-400" />
       <span className="sm:hidden">Products</span>
       <span className="hidden sm:inline">Product catalog</span>
     </>
@@ -29,7 +29,7 @@ export function CatalogLink() {
     return (
       <span
         aria-current="page"
-        className={`${BASE} cursor-default border-gray-200 bg-gray-50 text-gray-500`}
+        className={`${BASE} cursor-default border-white/15 bg-white/10 text-gray-300`}
       >
         {label}
       </span>
@@ -39,7 +39,7 @@ export function CatalogLink() {
   return (
     <Link
       href="/products"
-      className={`${BASE} border-gray-300 text-gray-700 hover:border-gray-400 hover:bg-gray-50 hover:text-gray-900`}
+      className={`${BASE} border-white/25 text-gray-100 hover:border-white/40 hover:bg-white/10 hover:text-white`}
     >
       {label}
     </Link>
