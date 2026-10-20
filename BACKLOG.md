@@ -56,6 +56,8 @@ visible, respecting `prefers-reduced-motion`.
   always get a clean 400 and write nothing
 - `SECURITY.md` states disclosure timelines; Dependabot groups security
   updates into one PR per ecosystem
+- Majors: @vercel/speed-insights 2, jsdom 30, @vitejs/plugin-react 6 (vite
+  8) and vitest-mock-extended 5, with no code changes
 
 ### 2026-10-20 — CI and security pipeline
 
