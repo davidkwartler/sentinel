@@ -45,6 +45,18 @@ visible, respecting `prefers-reduced-motion`.
 
 ## Changelog
 
+### 2026-10-20 — Dependency and Scorecard cleanup
+
+- Dev tooling advisories cleared: vitest 4.1.12 (with vite 7.3.7 and
+  @vitest/mocker), undici, js-yaml, picomatch, flatted, browserslist,
+  brace-expansion, esbuild, @babel/core, @humanfs/node. Left: the `braces`
+  chain under `eslint-config-next`, which has no patched release
+- fast-check property tests: `computeSimilarity` (range, symmetry, identity,
+  case and whitespace) and fuzzed bodies against the record route, which must
+  always get a clean 400 and write nothing
+- `SECURITY.md` states disclosure timelines; Dependabot groups security
+  updates into one PR per ecosystem
+
 ### 2026-10-20 — CI and security pipeline
 
 - CI on Node 22 as two parallel jobs: typecheck, lint and a production
