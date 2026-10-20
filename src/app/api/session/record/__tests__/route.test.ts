@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { NextRequest } from 'next/server'
+import fc from 'fast-check'
 
 // Mock next/server 'after' to avoid "after() must be called in a Next.js context" error.
 vi.mock('next/server', async (importOriginal) => {
@@ -502,6 +503,88 @@ describe('POST /api/session/record', () => {
       expect.objectContaining({
         data: expect.objectContaining({ os: 'Unknown' }),
       }),
+    )
+  })
+})
+
+// Fuzzing: the route takes untrusted JSON from the browser, so throw arbitrary
+// bodies at it and check it only ever rejects them cleanly: a 400, nothing
+// written, never a 500 or a throw.
+describe('POST /api/session/record with fuzzed bodies', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    vi.mocked(auth).mockResolvedValue({ user: { id: 'user-1' }, expires: '' } as never)
+    prismaMock.session.findUnique.mockResolvedValue({
+      id: 'sess-1',
+      sessionToken: 'tok',
+      userId: 'user-1',
+      expires: new Date(Date.now() + 3600000),
+    })
+  })
+
+  // A body carrying both ids as strings could be a valid payload; everything
+  // else must be rejected.
+  const couldBeValid = (v: unknown) =>
+    typeof v === 'object' &&
+    v !== null &&
+    typeof (v as Record<string, unknown>).visitorId === 'string' &&
+    typeof (v as Record<string, unknown>).requestId === 'string'
+
+  it('rejects any JSON value that is not a fingerprint payload', async () => {
+    await fc.assert(
+      fc.asyncProperty(
+        fc.jsonValue().filter((v) => !couldBeValid(v)),
+        async (body) => {
+          const response = await POST(makeRequest(body))
+          expect(response.status).toBe(400)
+        },
+      ),
+      { numRuns: 200 },
+    )
+    expect(prismaMock.fingerprint.create).not.toHaveBeenCalled()
+  })
+
+  it('rejects payloads whose fields have the wrong type or size', async () => {
+    const wrong = fc.oneof(
+      fc.constant(''),
+      fc.string({ minLength: 129, maxLength: 400 }),
+      fc.integer(),
+      fc.boolean(),
+      fc.constant(null),
+      fc.array(fc.string(), { maxLength: 3 }),
+    )
+    await fc.assert(
+      fc.asyncProperty(
+        fc.record({ visitorId: wrong, requestId: fc.string({ minLength: 1, maxLength: 128 }) }),
+        async (body) => {
+          const response = await POST(makeRequest(body))
+          expect(response.status).toBe(400)
+        },
+      ),
+      { numRuns: 100 },
+    )
+    expect(prismaMock.fingerprint.create).not.toHaveBeenCalled()
+  })
+
+  it('rejects any raw body that is not JSON', async () => {
+    await fc.assert(
+      fc.asyncProperty(fc.string(), async (raw) => {
+        let parsed: unknown
+        try {
+          parsed = JSON.parse(raw)
+        } catch {
+          parsed = undefined
+        }
+        fc.pre(!couldBeValid(parsed))
+        const request = new NextRequest('http://localhost/api/session/record', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Cookie: 'auth_session=tok' },
+          body: raw,
+        })
+        const response = await POST(request)
+        expect(response.status).toBe(400)
+      }),
+      { numRuns: 200 },
     )
   })
 })
