@@ -9,7 +9,7 @@ Session hijack detection app built with Next.js 16, Auth.js v5, FingerprintJS, P
 - `npm run test:run` — Run tests once (Vitest)
 - `npm test` — Run tests in watch mode
 - `npx tsc --noEmit` — Type-check without emitting
-- `npm run lint` — ESLint (CI runs typecheck, lint, tests, and build)
+- `npm run lint` — ESLint (CI runs typecheck, lint, `npm audit --omit=dev`, tests, and build; dependency review, zizmor and Scorecard run as separate workflows; CodeQL runs as GitHub default setup)
 - `npx prisma db push` — Push schema to database
 - `npx prisma generate` — Regenerate Prisma client (also runs on `npm install` via postinstall)
 
