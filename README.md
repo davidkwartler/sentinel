@@ -5,6 +5,8 @@
 **Session hijack detection powered by FingerprintJS Pro and Claude.**
 
 [![CI](https://github.com/davidkwartler/sentinel/actions/workflows/ci.yml/badge.svg)](https://github.com/davidkwartler/sentinel/actions/workflows/ci.yml)
+[![CodeQL](https://github.com/davidkwartler/sentinel/actions/workflows/codeql.yml/badge.svg)](https://github.com/davidkwartler/sentinel/actions/workflows/codeql.yml)
+[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/davidkwartler/sentinel/badge)](https://scorecard.dev/viewer/?uri=github.com/davidkwartler/sentinel)
 [![Live demo](https://img.shields.io/website?url=https%3A%2F%2Fsentinel.davidkwartler.com&label=live%20demo&up_message=online&down_message=offline)](https://sentinel.davidkwartler.com)
 [![License: MIT](https://img.shields.io/badge/license-MIT-7C3AED)](LICENSE)
 
@@ -202,6 +204,27 @@ Tests cover: `computeSimilarity` edge cases, `runDetection` transaction logic (m
 `POST /api/session/record` response shapes (401 auth guard, 400 validation, 200 duplicate),
 and `verifyFingerprint` server-API behaviour (override, client-mismatch detection, stale
 events, bot signals, fail-open on lookup errors).
+
+## CI and security
+
+Every workflow pins its actions to commit SHAs and starts from a read-only
+token, granting more per job only where it needs it.
+
+- **CI** (`ci.yml`): typecheck, lint and `npm audit` (production
+  dependencies, high and up) in one job; Vitest and the production build in
+  another. A new push to a PR cancels its older run.
+- **CodeQL** (`codeql.yml`): `security-extended` code scanning for the
+  TypeScript (API routes, auth, detection) and for the workflows themselves,
+  on PRs, main and weekly.
+- **Dependency review** (`dependency-review.yml`): fails a PR that adds a
+  dependency with a known high-severity vulnerability.
+- **Workflow security** (`zizmor.yml`): zizmor audits the workflow files
+  when they change.
+- **Scorecard** (`scorecard.yml`): the OpenSSF security-posture score behind
+  the README badge, weekly and on pushes to main.
+- **Dependabot** (`dependabot.yml`): one grouped PR a week each for npm and
+  the pinned actions, after a seven-day cooldown on new releases.
+- **Security policy:** [`SECURITY.md`](SECURITY.md).
 
 ## Deploying to Vercel
 
