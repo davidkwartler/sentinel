@@ -5,7 +5,7 @@
 **Session hijack detection powered by FingerprintJS Pro and Claude.**
 
 [![CI](https://github.com/davidkwartler/sentinel/actions/workflows/ci.yml/badge.svg)](https://github.com/davidkwartler/sentinel/actions/workflows/ci.yml)
-[![CodeQL](https://github.com/davidkwartler/sentinel/actions/workflows/codeql.yml/badge.svg)](https://github.com/davidkwartler/sentinel/actions/workflows/codeql.yml)
+[![CodeQL](https://github.com/davidkwartler/sentinel/actions/workflows/github-code-scanning/codeql/badge.svg)](https://github.com/davidkwartler/sentinel/actions/workflows/github-code-scanning/codeql)
 [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/davidkwartler/sentinel/badge)](https://scorecard.dev/viewer/?uri=github.com/davidkwartler/sentinel)
 [![Live demo](https://img.shields.io/website?url=https%3A%2F%2Fsentinel.davidkwartler.com&label=live%20demo&up_message=online&down_message=offline)](https://sentinel.davidkwartler.com)
 [![License: MIT](https://img.shields.io/badge/license-MIT-7C3AED)](LICENSE)
@@ -213,9 +213,9 @@ token, granting more per job only where it needs it.
 - **CI** (`ci.yml`): typecheck, lint and `npm audit` (production
   dependencies, high and up) in one job; Vitest and the production build in
   another. A new push to a PR cancels its older run.
-- **CodeQL** (`codeql.yml`): `security-extended` code scanning for the
-  TypeScript (API routes, auth, detection) and for the workflows themselves,
-  on PRs, main and weekly.
+- **CodeQL**: GitHub's default code scanning setup (configured in the
+  repo's settings, not a workflow file) covers the TypeScript (API routes,
+  auth, detection) and the workflows themselves on PRs and main.
 - **Dependency review** (`dependency-review.yml`): fails a PR that adds a
   dependency with a known high-severity vulnerability.
 - **Workflow security** (`zizmor.yml`): zizmor audits the workflow files

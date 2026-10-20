@@ -77,9 +77,9 @@ the architecture the project wants to show off. Whatever is used should respect
 
 - CI and security pipeline. CI split into parallel jobs (typecheck, lint
   and a production `npm audit` gate; Vitest and build) on Node 22, with
-  superseded PR runs cancelled. New workflows: CodeQL (`security-extended`,
-  TypeScript and the workflows), dependency review, zizmor, OpenSSF
-  Scorecard. Dependabot for npm and actions, grouped weekly with a 7-day
+  superseded PR runs cancelled. New workflows: dependency review, zizmor, OpenSSF Scorecard; CodeQL
+  stays on GitHub default setup, which already scans the TypeScript and the
+  workflows. Dependabot for npm and actions, grouped weekly with a 7-day
   cooldown. Every action SHA-pinned, read-only tokens by default, no
   persisted checkout credentials. The audit gate's first run cleared 5 high
   advisories via non-breaking bumps (Next 16.4.2, Prisma 7.10.1,
