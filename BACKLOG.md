@@ -1,105 +1,131 @@
 # Backlog
 
-Reopened 2026-07-28 from a UI/UX pass over the running app. The previous
-entries all shipped and were archived on branch `backlog/all-items`; nothing
-below is a regression of those.
-
-These are ordered by what each one does for the demo, not by effort. The first
-two change what a reviewer actually sees; the rest are correctness and polish.
+Groomed 2026-10-20. Open work up top, ordered by what it does for the demo,
+then a changelog of everything shipped. Detailed write-ups of the July
+batches live on branch `backlog/all-items`.
 
 ## Next
 
-### The hijack simulation is gated behind a README
+### Simulate a hijack without the README
 
-The empty state at `src/components/SessionTable.tsx:112` tells the reader to go
-find the README, copy their `auth_session` cookie out of devtools by hand, open
-a second browser, and paste it in. That is the one moment the entire application
-exists to produce, and it is sitting behind a manual multi-step chore performed
-in another tool.
+The sessions page's empty state sends people to the README to copy their
+`auth_session` cookie out of devtools and paste it into a second browser, so
+most visitors never see detection fire. Add a "Simulate hijack" control that
+copies the signed-in user's own cookie and shows the remaining steps inline.
+Decide at build time whether it ships in production or sits behind a build
+flag like the model and threshold pickers.
 
-The practical consequence is that most people evaluating this repo never see
-detection fire. They read that it works. A demo whose central claim is only ever
-asserted is doing the same thing the analysis pipeline is built to avoid.
+### Act on a flagged session
 
-Proposal: a "Simulate hijack" affordance on the sessions page that copies the
-current session cookie to the clipboard and shows the two remaining steps
-inline. No new attack surface — it exposes the user's own cookie to the user,
-which devtools already does, and it should be gated to the signed-in session
-only. The win is converting a README instruction into something that happens
-on screen in about fifteen seconds.
+Detection flags, scores and explains a hijack, then offers nothing to do about
+it. Add "Revoke session" to flagged rows so the session list is a control
+surface, not a readout. It's the one destructive, irreversible action in the
+UI, so it's where red belongs; sign out stays neutral because it's reversible.
 
-Worth deciding at implementation time whether this ships in production or stays
-behind the same kind of build flag as the model and threshold pickers.
+### Route-level loading, error and not-found states
 
-### A flagged session has no action attached to it
+There's no `loading.tsx`, `error.tsx` or `not-found.tsx` anywhere. In order of
+value: a skeleton for `/sessions` (the heaviest server render), a designed 404
+for unknown `/products/[id]`, and an error boundary of our own instead of the
+framework default.
 
-There is no revoke, terminate, or sign-out-elsewhere anywhere in the codebase —
-`grep -ri revoke src/` returns nothing. The dashboard detects a hijack, scores
-it, explains its reasoning, and then offers the user nothing to do about it. The
-story stops one step short of where a security product's story ends.
+### Make `ANALYZING` look alive
 
-Adding "Revoke session" to a flagged row completes that loop, and it makes the
-session list a control surface rather than a readout.
-
-It also settles a palette question that came up separately. Red currently means
-one thing in this app — flagged, hijack suspected (`SessionTable.tsx:803`,
-`:468`, `:495`). Revoke is the first genuinely destructive, genuinely
-irreversible control in the UI, so it is the one place red is earned. That is
-the reason sign out stays neutral: it is reversible by signing back in, and
-spending the alarm colour on it would dull the signal the dashboard exists to
-raise.
-
-### No route-level loading, error, or not-found states
-
-`find src/app -name "loading.tsx" -o -name "error.tsx" -o -name "not-found.tsx"`
-returns nothing. Three gaps follow from that:
-
-- Navigating to `/sessions` holds the previous page until the server responds,
-  with no indication anything was clicked. A skeleton for the session table is
-  the highest-value one, since that route does the most server work.
-- `/products/[id]` with an unknown id has no designed 404.
-- An unhandled render error anywhere takes out the segment with the framework
-  default rather than anything of ours.
-
-### `ANALYZING` does not look like it is doing anything
-
-The status pill at `src/components/SessionTable.tsx:804` is static amber while
-Claude is mid-analysis. A badge that reads ANALYZING and never moves is
-indistinguishable from one that is stuck, and the row can sit there for several
-seconds.
-
-An elapsed counter, or motion on the row, makes the asynchronous pipeline
-legible — which is worth doing precisely because that pipeline is the part of
-the architecture the project wants to show off. Whatever is used should respect
-`prefers-reduced-motion`, as the footer reveal already does.
-
-## Done
-
-- CI and security pipeline. CI split into parallel jobs (typecheck, lint
-  and a production `npm audit` gate; Vitest and build) on Node 22, with
-  superseded PR runs cancelled. New workflows: dependency review, zizmor, OpenSSF Scorecard; CodeQL
-  stays on GitHub default setup, which already scans the TypeScript and the
-  workflows. Dependabot for npm and actions, grouped weekly with a 7-day
-  cooldown. Every action SHA-pinned, read-only tokens by default, no
-  persisted checkout credentials. The audit gate's first run cleared 5 high
-  advisories via non-breaking bumps (Next 16.4.2, Prisma 7.10.1,
-  source-map-js, deepmerge-ts). `SECURITY.md` added.
-
-- Polling runs unconditionally, including on a hidden tab. `PollingRefresher`
-  now stops while `document.hidden`, refreshes immediately on return, and the
-  sessions page polls every 8s only while an event is `PENDING` (30s otherwise).
-
-Entries that shipped before this file was reopened are on branch
-`backlog/all-items`.
+The amber ANALYZING pill is static while Claude works, so a slow analysis looks
+stuck. An elapsed counter or subtle motion on the row makes the async pipeline
+visible, respecting `prefers-reduced-motion`.
 
 ## Not doing
 
-- Redirects from `/dashboard` and `/profile` — the old URLs were never shared.
-- Per-user server-side detection settings. Per-browser via localStorage is
-  fine for a demo, and it avoids a schema change.
-- Red styling on sign out. Considered and rejected: red is the flagged/hijack
-  status colour throughout this app, and sign out is reversible. See the revoke
-  entry above for where red belongs instead.
-- A tinted tray behind the sign out row. Tried and reverted — the existing rule
-  plus the lighter text already carry the separation, and a third cue on a
-  four-item menu was more treatment than the problem needed.
+- Redirects from `/dashboard` and `/profile`: the old URLs were never shared.
+- Per-user server-side detection settings: per-browser localStorage is fine for
+  a demo and avoids a schema change.
+
+---
+
+## Changelog
+
+### 2026-10-20 — CI and security pipeline
+
+- CI on Node 22 as two parallel jobs: typecheck, lint and a production
+  `npm audit` gate; Vitest and build. Superseded PR runs cancel
+- Dependency review, zizmor and OpenSSF Scorecard workflows; CodeQL stays on
+  GitHub default setup, which scans the TypeScript and the workflows
+- Dependabot for npm and actions, grouped weekly with a 7-day cooldown
+- Every action SHA-pinned, read-only tokens by default, no persisted checkout
+  credentials. `SECURITY.md` added
+- The audit gate's first run cleared 5 high advisories with non-breaking
+  bumps: Next 16.4.2, Prisma 7.10.1, source-map-js, deepmerge-ts
+
+### 2026-09-28 — Aurora Flat restyle, hardening, keepalive cron
+
+- Restyled as Aurora Flat: Plus Jakarta Sans, lavender-tinted grays, violet
+  as the only accent, an ink-band header, and the iris-scan `SentinelMark`
+  logo (flat shield for the favicon)
+- Header nav: Products and Sessions as section links (icon-only on phones),
+  an amber warning on Sessions when any live session is flagged, and every
+  page in the account menu
+- Security: critical-advisory upgrades (Next, Auth.js, Prisma), auth gated
+  on `session?.user?.id`, baseline security headers, and a record route that
+  rejects malformed JSON and caps writes per user per hour. Claude output is
+  checked (end of turn, score clamped to 0-100) before it's trusted
+- Speed: database indexes for the session and detection queries; polling
+  pauses on a hidden tab and runs every 8s only while an event is pending
+- Accessibility: cart and login are native `<dialog>`s (focus trap, Escape,
+  focus return), the account menu has full keyboard support, and the
+  fingerprint toast and session stats are live regions
+- Daily Vercel Cron, gated by `CRON_SECRET`, keeps the Fingerprint workspace
+  active
+
+### 2026-07-28 — Using the Fingerprint data we pay for
+
+- Verified identification events are kept, not just five of their fields:
+  IP geolocation, ASN and datacenter now persist, so re-analysis sees the
+  same evidence and impossible travel uses server-observed coordinates
+- The Tor exit node signal reaches the prompt, read two-sided: switching to
+  Tor mid-session is evidence, Tor throughout is a privacy-minded user
+- The prompt no longer explains hijacks away as incognito browsing
+- Footer credit links back to davidkwartler.com
+
+### 2026-07-27 — Detection gaps and hardening
+
+- Fingerprint verification is decided server-side, never from the
+  client-supplied mode, and a downgrade from verified to unverifiable is a
+  signal for Claude
+- Fingerprints and detection events keyed to the user, not the session, with
+  a Detection history section for events whose session is gone
+- A silent Pro-to-OSS fallback is surfaced; fingerprint components are
+  validated by shape; the client flag threshold sits behind a build flag
+- Fingerprint data enrichment spec (`docs/fingerprint-enrichment.md`)
+
+### 2026-07-25 — Visual identity and mobile pass
+
+- Violet shield logo, footer, and icons in place of emoji
+- Mobile pass on product rows, footer and header; official Google mark and
+  reworked sign-in copy
+- Violet for interaction: focus rings, slider, selected segment
+
+### 2026-07-24 — Detection pipeline and dashboard overhaul
+
+- Sessions resolve by the presented cookie token; fingerprint ingest and
+  detection run in one transaction
+- Fingerprints verified server-side through the Fingerprint Server API, with
+  a health-check endpoint
+- Flag-threshold slider (minimum 20), an analysis-off mode, a calibrated
+  system prompt and current Claude models in the picker
+- Session monitoring dashboard overhauled; account page redesigned with
+  segmented controls; routes renamed `/profile` → `/account` and
+  `/dashboard` → `/sessions`
+
+### 2026-05-02 — Pro by default
+
+- FingerprintJS Pro is the default when an API key is set, with a mode badge
+  in the UI
+
+### 2026-02-28 — v1
+
+- Next.js 16, Prisma 7 and Auth.js v5 foundation with an e-commerce demo
+  shell, fingerprint capture, the detection engine (similarity scoring), async
+  Claude analysis with structured outputs, and the security dashboard
+- Anonymous `auth_session` cookie set in middleware to make the hijack demo
+  reproducible
